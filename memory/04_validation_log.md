@@ -8,6 +8,7 @@
 - first `post_task_check` advisory IRQL fixture verified
 - compliant `post_task_check` IRQL fixture verified
 - pool-allocation advisory fixture verified
+- compliant pool-allocation fixture verified
 
 ## Latest Verified Flow
 
@@ -17,6 +18,7 @@
 - `post_task_check.py --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt --checks-file ..\Kernel-Driver-Contract\fixtures\irql_violation.checks.json --contract ..\Kernel-Driver-Contract\contract.yaml --format json`
 - `post_task_check.py --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt --checks-file ..\Kernel-Driver-Contract\fixtures\irql_compliant.checks.json --contract ..\Kernel-Driver-Contract\contract.yaml --format json`
 - `post_task_check.py --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt --checks-file ..\Kernel-Driver-Contract\fixtures\pool_violation.checks.json --contract ..\Kernel-Driver-Contract\contract.yaml --format json`
+- `post_task_check.py --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt --checks-file ..\Kernel-Driver-Contract\fixtures\pool_compliant.checks.json --contract ..\Kernel-Driver-Contract\contract.yaml --format json`
 
 ## Observed Result
 
@@ -25,6 +27,7 @@
 - result remained reviewer-consumable through advisory warnings
 - compliant fixture produced no IRQL domain violation while preserving the same built-in evidence baseline
 - pool fixture produced `KD-POOL-001` advisory warning for legacy pool allocation guidance
+- compliant pool fixture produced no pool-type domain warning while preserving the same built-in evidence baseline
 
 ## Pending Evidence
 

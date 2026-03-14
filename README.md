@@ -55,6 +55,8 @@ The repository now includes two post-task baselines:
   - expected result: no domain-validator IRQL violation
 - `fixtures/pool_violation.checks.json`
   - expected result: advisory `KD-POOL-001` warning
+- `fixtures/pool_compliant.checks.json`
+  - expected result: no pool-type domain warning
 
 ## Next Step
 
