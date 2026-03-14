@@ -46,6 +46,13 @@ $env:AI_GOVERNANCE_PYTHON='C:\Users\daish\AppData\Local\Python\pythoncore-3.14-6
 
 The included post-task fixture intentionally triggers an advisory IRQL warning through `KeWaitForSingleObject` in a dispatch-level code sample.
 
+The repository now includes two post-task baselines:
+
+- `fixtures/irql_violation.checks.json`
+  - expected result: advisory `KD-IRQL-001` warning
+- `fixtures/irql_compliant.checks.json`
+  - expected result: no domain-validator IRQL violation
+
 ## Next Step
 
 The next recommended step is to connect this contract repo to a real driver codebase using:

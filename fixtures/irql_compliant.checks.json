@@ -1,0 +1,22 @@
+{
+  "dispatch_level_code": "NTSTATUS DriverDispatch(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "driver_code": "NTSTATUS DriverDispatch(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/driver_dispatch_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_irql_passive_level_contract",
+    "driver_tests::test_ioctl_invalid_input_rejected",
+    "driver_tests::test_cleanup_unwind_on_partial_init_failure",
+    "driver_tests::test_failure_path_returns_status_unsuccessful"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms dispatch_level path remains nonpageable"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}
