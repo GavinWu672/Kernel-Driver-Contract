@@ -14,6 +14,7 @@ It is intended to work as an external domain contract for `ai-governance-framewo
 - `validators/irql_safety_validator.py`
 - `docs/architecture-review.md`
 - `PLAN.md`
+- `memory/`
 
 ## Integration Goal
 
@@ -54,3 +55,5 @@ The next recommended step is to connect this contract repo to a real driver code
 - `FACT_INTAKE_WORKSHEET.md`
 
 These files are intentionally minimal and exist only to support the first real driver-repo intake, not to create a large memory platform.
+
+The repository now also includes a minimal `memory/` layer so confirmed driver facts, decisions, and validation results have a stable place to persist once a real driver codebase is connected.
