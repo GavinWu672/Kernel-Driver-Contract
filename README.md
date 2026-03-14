@@ -44,3 +44,13 @@ $env:AI_GOVERNANCE_PYTHON='C:\Users\daish\AppData\Local\Python\pythoncore-3.14-6
 ```
 
 The included post-task fixture intentionally triggers an advisory IRQL warning through `KeWaitForSingleObject` in a dispatch-level code sample.
+
+## Next Step
+
+The next recommended step is to connect this contract repo to a real driver codebase using:
+
+- `FACT_INTAKE.md`
+- `SOURCE_INVENTORY.md`
+- `FACT_INTAKE_WORKSHEET.md`
+
+These files are intentionally minimal and exist only to support the first real driver-repo intake, not to create a large memory platform.
