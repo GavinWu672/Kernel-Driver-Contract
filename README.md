@@ -33,4 +33,14 @@ $env:AI_GOVERNANCE_PYTHON='C:\Users\daish\AppData\Local\Python\pythoncore-3.14-6
 & $env:AI_GOVERNANCE_PYTHON governance_tools\domain_contract_loader.py `
   --contract ..\Kernel-Driver-Contract\contract.yaml `
   --format human
+
+& $env:AI_GOVERNANCE_PYTHON runtime_hooks\core\post_task_check.py `
+  --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt `
+  --risk medium `
+  --oversight review-required `
+  --checks-file ..\Kernel-Driver-Contract\fixtures\irql_violation.checks.json `
+  --contract ..\Kernel-Driver-Contract\contract.yaml `
+  --format human
 ```
+
+The included post-task fixture intentionally triggers an advisory IRQL warning through `KeWaitForSingleObject` in a dispatch-level code sample.

@@ -1,0 +1,12 @@
+[Governance Contract]
+LANG = C++
+LEVEL = L2
+SCOPE = feature
+PLAN = PLAN.md
+LOADED = SYSTEM_PROMPT, HUMAN-OVERSIGHT
+CONTEXT = repo -> runtime-governance; NOT: platform rewrite
+PRESSURE = SAFE (20/200)
+RULES = common,kernel-driver
+RISK = medium
+OVERSIGHT = review-required
+MEMORY_MODE = candidate
