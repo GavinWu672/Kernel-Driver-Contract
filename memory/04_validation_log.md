@@ -9,6 +9,7 @@
 - compliant `post_task_check` IRQL fixture verified
 - pool-allocation advisory fixture verified
 - compliant pool-allocation fixture verified
+- operational workflow documentation added for reproducible verification
 
 ## Latest Verified Flow
 
@@ -28,6 +29,7 @@
 - compliant fixture produced no IRQL domain violation while preserving the same built-in evidence baseline
 - pool fixture produced `KD-POOL-001` advisory warning for legacy pool allocation guidance
 - compliant pool fixture produced no pool-type domain warning while preserving the same built-in evidence baseline
+- workflow and validation requirements are now documented inside the contract repo for repeatable operator use
 
 ## Pending Evidence
 

@@ -10,7 +10,9 @@ Maintain the Kernel Driver Contract as a reusable external domain contract for `
 - `session_start` context injection works
 - `pre_task_check` external rule activation works
 - `post_task_check` can execute the first advisory IRQL validation fixture
+- `post_task_check` can execute advisory pool-allocation validation
 - minimal fact-intake workflow exists through `FACT_INTAKE.md`, `SOURCE_INVENTORY.md`, and `FACT_INTAKE_WORKSHEET.md`
+- operational usage docs exist through `WORKFLOW.md` and `VALIDATION_REQUIREMENTS.md`
 
 ## Next Action
 

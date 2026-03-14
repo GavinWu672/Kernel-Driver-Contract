@@ -10,6 +10,8 @@ It is intended to work as an external domain contract for `ai-governance-framewo
 - `AGENTS.md`
 - `KERNEL_DRIVER_CHECKLIST.md`
 - `KERNEL_DRIVER_ARCHITECTURE.md`
+- `WORKFLOW.md`
+- `VALIDATION_REQUIREMENTS.md`
 - `rules/kernel-driver/safety.md`
 - `validators/irql_safety_validator.py`
 - `validators/pool_type_validator.py`
@@ -57,6 +59,17 @@ The repository now includes two post-task baselines:
   - expected result: advisory `KD-POOL-001` warning
 - `fixtures/pool_compliant.checks.json`
   - expected result: no pool-type domain warning
+
+## Operational Docs
+
+Use these documents as the primary operational layer for this repo:
+
+- `WORKFLOW.md`
+  - describes the smallest end-to-end governance path
+- `VALIDATION_REQUIREMENTS.md`
+  - lists the validation layers and baseline expectations that should remain reproducible
+- `FACT_INTAKE.md`
+  - describes how to connect a real driver repository without inflating this repo's scope
 
 ## Next Step
 
