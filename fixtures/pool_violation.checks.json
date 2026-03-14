@@ -1,0 +1,24 @@
+{
+  "driver_code": "PVOID AllocateBuffer(SIZE_T Length) {\n    UNREFERENCED_PARAMETER(Length);\n    return ExAllocatePoolWithTag(NonPagedPool, 256, 'buf1');\n}\n",
+  "changed_files": [
+    "fixtures/src/pool_alloc.c"
+  ],
+  "test_names": [
+    "driver_tests::test_ioctl_invalid_input_rejected",
+    "driver_tests::test_cleanup_unwind_on_partial_init_failure",
+    "driver_tests::test_failure_path_returns_status_unsuccessful"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms allocation path remains nonpageable"
+  ],
+  "ioctl_boundary_verified": true,
+  "cleanup_verified": true,
+  "exception_verified": true,
+  "irql_verified": true,
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

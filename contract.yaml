@@ -18,3 +18,4 @@ ai_behavior_override:
   - AGENTS.md
 validators:
   - validators/irql_safety_validator.py
+  - validators/pool_type_validator.py

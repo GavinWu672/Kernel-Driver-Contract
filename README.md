@@ -12,6 +12,7 @@ It is intended to work as an external domain contract for `ai-governance-framewo
 - `KERNEL_DRIVER_ARCHITECTURE.md`
 - `rules/kernel-driver/safety.md`
 - `validators/irql_safety_validator.py`
+- `validators/pool_type_validator.py`
 - `docs/architecture-review.md`
 - `PLAN.md`
 - `memory/`
@@ -52,6 +53,8 @@ The repository now includes two post-task baselines:
   - expected result: advisory `KD-IRQL-001` warning
 - `fixtures/irql_compliant.checks.json`
   - expected result: no domain-validator IRQL violation
+- `fixtures/pool_violation.checks.json`
+  - expected result: advisory `KD-POOL-001` warning
 
 ## Next Step
 
