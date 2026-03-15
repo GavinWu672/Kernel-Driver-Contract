@@ -1,0 +1,51 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/isrdpc.c",
+  "scope": "callback_role_classification",
+  "notes": "WDF interrupt callbacks from pcidrv sample. EVT_WDF_INTERRUPT_ENABLE/DISABLE run at DIRQL (same level as ISR), not PASSIVE_LEVEL. NICEvtDeviceD0* run at PASSIVE_LEVEL during power transitions.",
+  "functions": {
+    "NICEvtInterruptIsr": {
+      "label": "isr",
+      "notes": "EVT_WDF_INTERRUPT_ISR — called at DIRQL"
+    },
+    "NICEvtInterruptDpc": {
+      "label": "dpc",
+      "notes": "EVT_WDF_INTERRUPT_DPC — called at DISPATCH_LEVEL"
+    },
+    "NICWatchDogEvtTimerFunc": {
+      "label": "dpc",
+      "notes": "EVT_WDF_TIMER — fires at DISPATCH_LEVEL"
+    },
+    "NICEvtInterruptEnable": {
+      "label": "isr",
+      "notes": "EVT_WDF_INTERRUPT_ENABLE — called at DIRQL with interrupts disabled; scanner currently misclassifies as 'other' (known false negative)"
+    },
+    "NICEvtInterruptDisable": {
+      "label": "isr",
+      "notes": "EVT_WDF_INTERRUPT_DISABLE — called at DIRQL with interrupts disabled; scanner currently misclassifies as 'other' (known false negative)"
+    },
+    "NICCheckForHang": {
+      "label": "dispatch",
+      "notes": "NDIS MiniportCheckForHangEx — called periodically by NDIS at PASSIVE or DISPATCH"
+    },
+    "NICReset": {
+      "label": "dispatch",
+      "notes": "NDIS MiniportResetEx — PASSIVE_LEVEL but registered as NDIS dispatch callback"
+    },
+    "NICLinkDetection": {
+      "label": "dispatch",
+      "notes": "Registered via NdisMSetPeriodicTimer or work item; dispatch-level context"
+    },
+    "NICEvtDeviceD0EntryPostInterruptsEnabled": {
+      "label": "other",
+      "notes": "EVT_WDF_DEVICE_D0_ENTRY_POST_INTERRUPTS_ENABLED — power callback, PASSIVE_LEVEL; not a DPC/ISR/dispatch routine"
+    },
+    "NICEvtDeviceD0ExitPreInterruptsDisabled": {
+      "label": "other",
+      "notes": "EVT_WDF_DEVICE_D0_EXIT_PRE_INTERRUPTS_DISABLED — power callback, PASSIVE_LEVEL; not a DPC/ISR/dispatch routine"
+    },
+    "NICStartWatchDogTimer": {
+      "label": "other",
+      "notes": "Helper that calls WdfTimerStart — not itself a callback; no framework role"
+    }
+  }
+}

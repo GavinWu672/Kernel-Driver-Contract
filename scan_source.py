@@ -276,10 +276,11 @@ def _analyse_file(path: Path, wdf_registry: dict[str, str] | None = None) -> Fil
 def _classify_func(func: FuncInfo, analysis: FileAnalysis) -> str:
     """
     Returns the IRQL context key for this function:
-      'dpc'      - DPC routine
-      'isr'      - ISR routine
-      'dispatch' - runs at DISPATCH_LEVEL (spinlock-held, KeRaiseIrql, etc.)
-      'driver'   - general driver code (PASSIVE or unknown)
+      'dpc'      - DPC routine (runs at DISPATCH_LEVEL via framework callback)
+      'isr'      - ISR routine (runs at DIRQL)
+      'dispatch' - runs at DISPATCH_LEVEL (spinlock-held or KeRaiseIrql evidence)
+      'other'    - all other code: helpers, init paths, pageable routines, unknown
+                   (previously named 'driver'; renamed to avoid false semantic clarity)
     """
     name = func.name
     body = func.body
@@ -296,7 +297,7 @@ def _classify_func(func: FuncInfo, analysis: FileAnalysis) -> str:
         return analysis.wdf_registry[name]
     if _SPINLOCK_USE.search(body) or _RAISE_IRQL.search(body):
         return "dispatch"
-    return "driver"
+    return "other"
 
 
 # ── Payload builder ──────────────────────────────────────────────────────────
@@ -306,12 +307,17 @@ def build_payload(analysis: FileAnalysis) -> dict:
         "dpc": [],
         "isr": [],
         "dispatch": [],
-        "driver": [],
+        "other": [],
+    }
+    # classified_functions: label → list of function names (for precision tooling)
+    classified_functions: dict[str, list[str]] = {
+        "dpc": [], "isr": [], "dispatch": [], "other": []
     }
 
     for func in analysis.functions:
         key = _classify_func(func, analysis)
         buckets[key].append(func.body)
+        classified_functions[key].append(func.name)
 
     def join(parts: list[str]) -> str:
         return "\n\n".join(parts)
@@ -322,6 +328,7 @@ def build_payload(analysis: FileAnalysis) -> dict:
         "changed_files": [str(analysis.path)],
         "pageable_functions": sorted(analysis.pageable_funcs),
         "dispatch_handlers": analysis.dispatch_handlers,
+        "classified_functions": classified_functions,
         "diagnostics": [],
         "summary": {"failed": 0},
         "warnings": [],
@@ -334,10 +341,8 @@ def build_payload(analysis: FileAnalysis) -> dict:
         payload["dpc_code"] = join(buckets["dpc"])
     if buckets["isr"]:
         payload["isr_code"] = join(buckets["isr"])
-
-    # driver_code already contains full text; also provide parsed-only view
-    if buckets["driver"]:
-        payload["driver_functions_code"] = join(buckets["driver"])
+    if buckets["other"]:
+        payload["other_functions_code"] = join(buckets["other"])
 
     return payload
 
@@ -397,15 +402,17 @@ def collect_sources(target: Path) -> list[Path]:
 
 def _print_file_summary(payload: dict) -> None:
     src = payload.get("source_file") or payload.get("source_dir", "?")
-    funcs_disp = len(payload.get("dispatch_level_code", "").split("\n\n")) if payload.get("dispatch_level_code") else 0
-    funcs_dpc  = len(payload.get("dpc_code", "").split("\n\n"))           if payload.get("dpc_code")  else 0
-    funcs_isr  = len(payload.get("isr_code", "").split("\n\n"))           if payload.get("isr_code")  else 0
+    cf = payload.get("classified_functions", {})
+    funcs_disp = len(cf.get("dispatch", []))
+    funcs_dpc  = len(cf.get("dpc", []))
+    funcs_isr  = len(cf.get("isr", []))
+    funcs_other = len(cf.get("other", []))
     handlers   = len(payload.get("dispatch_handlers", {}))
     pageable   = len(payload.get("pageable_functions", []))
     print(
         f"  {Path(src).name:<40s} "
-        f"dispatch={funcs_disp} dpc={funcs_dpc} isr={funcs_isr} "
-        f"handlers={handlers} pageable={pageable}"
+        f"isr={funcs_isr} dpc={funcs_dpc} dispatch={funcs_disp} "
+        f"other={funcs_other} handlers={handlers} pageable={pageable}"
     )
 
 

@@ -1,0 +1,51 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/nic_send.c",
+  "scope": "callback_role_classification",
+  "notes": "WDF I/O and DMA callbacks from pcidrv send path. EVT_WDF_IO_QUEUE_IO_WRITE (PciDrvEvtIoWrite) is an I/O queue callback — runs at the queue's dispatch type (Sequential/Parallel). Excluded from isr/dpc labels; 'other' is correct because queue callbacks are not in scope for this classifier.",
+  "functions": {
+    "NICEvtProgramDmaFunction": {
+      "label": "dpc",
+      "notes": "EVT_WDF_PROGRAM_DMA — called at DISPATCH_LEVEL by the DMA engine"
+    },
+    "PciDrvEvtIoWrite": {
+      "label": "other",
+      "notes": "EVT_WDF_IO_QUEUE_IO_WRITE — I/O queue callback; IRQL depends on queue config. Out of scope for callback_role_classification (not isr/dpc/dispatch in the WDM sense)"
+    },
+    "NICInitiateDmaTransfer": {
+      "label": "other",
+      "notes": "Internal helper, not a framework callback"
+    },
+    "NICWritePacket": {
+      "label": "other",
+      "notes": "Internal helper, not a framework callback"
+    },
+    "NICSendPacket": {
+      "label": "other",
+      "notes": "Internal helper, not a framework callback"
+    },
+    "NICStartSend": {
+      "label": "other",
+      "notes": "Internal helper, not a framework callback"
+    },
+    "NICHandleSendInterrupt": {
+      "label": "other",
+      "notes": "Called from DPC context but is not itself a registered callback — helper function"
+    },
+    "NICCheckForQueuedSends": {
+      "label": "other",
+      "notes": "Internal helper called from DPC; not a framework callback"
+    },
+    "NICFreeBusySendPackets": {
+      "label": "other",
+      "notes": "Internal helper, not a framework callback"
+    },
+    "MP_FREE_SEND_PACKET": {
+      "label": "dispatch",
+      "notes": "Macro/inline that maps to a dispatch path; scanner picks up as function definition due to macro expansion pattern"
+    },
+    "NICFreeQueuedSendPackets": {
+      "label": "dispatch",
+      "notes": "Called during queue drain — PASSIVE or DISPATCH context depending on caller"
+    }
+  }
+}
