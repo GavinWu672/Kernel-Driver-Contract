@@ -19,3 +19,6 @@ ai_behavior_override:
 validators:
   - validators/irql_safety_validator.py
   - validators/pool_type_validator.py
+hard_stop_rules:
+  - KD-002
+  - KD-003

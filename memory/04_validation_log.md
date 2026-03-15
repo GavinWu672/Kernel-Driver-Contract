@@ -5,7 +5,7 @@
 - External contract loading verified from `ai-governance-framework`
 - `session_start` context injection verified
 - `pre_task_check` external `kernel-driver` rule activation verified
-- first `post_task_check` advisory IRQL fixture verified
+- first `post_task_check` IRQL hard-stop fixture verified
 - compliant `post_task_check` IRQL fixture verified
 - pool-allocation advisory fixture verified
 - compliant pool-allocation fixture verified
@@ -25,10 +25,11 @@
 
 - built-in kernel-driver evidence gate passed
 - domain validator produced `KD-IRQL-001` for `KeWaitForSingleObject`
-- result remained reviewer-consumable through advisory warnings
+- result now blocks `ok=True` when the violated rule ID maps to `hard_stop_rules`
 - compliant fixture produced no IRQL domain violation while preserving the same built-in evidence baseline
-- pool fixture produced `KD-POOL-001` advisory warning for legacy pool allocation guidance
+- pool fixture produced `KD-POOL-001` advisory warning for legacy pool allocation guidance without also tripping the IRQL hard-stop path
 - compliant pool fixture produced no pool-type domain warning while preserving the same built-in evidence baseline
+- contract policy now marks `KD-002` and `KD-003` as `hard_stop_rules`
 - workflow and validation requirements are now documented inside the contract repo for repeatable operator use
 
 ## Pending Evidence

@@ -1,5 +1,5 @@
 {
-  "driver_code": "PVOID AllocateBuffer(SIZE_T Length) {\n    UNREFERENCED_PARAMETER(Length);\n    return ExAllocatePoolWithTag(NonPagedPool, 256, 'buf1');\n}\n",
+  "driver_code": "PVOID AllocateBuffer(SIZE_T Length) {\n    UNREFERENCED_PARAMETER(Length);\n    return ExAllocatePool(NonPagedPool, 256);\n}\n",
   "changed_files": [
     "fixtures/src/pool_alloc.c"
   ],

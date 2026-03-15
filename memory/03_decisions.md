@@ -10,5 +10,10 @@
 ## Pending Decisions
 
 - Whether IRQL annotations should become a hard requirement or remain advisory at the contract level
-- Whether `KD-002` and `KD-003` should be escalated beyond advisory domain-validator execution
 - Which real driver repository should be used as the first fact-intake target
+
+## 2026-03-15
+
+- `KD-002` and `KD-003` are now recorded as `hard_stop_rules` in `contract.yaml`
+  so framework-side enforcement routing can treat IRQL misuse as a blocking outcome.
+- Pool allocation guidance remains advisory for now, so `KD-005` is intentionally left out of `hard_stop_rules`.

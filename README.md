@@ -47,12 +47,20 @@ $env:AI_GOVERNANCE_PYTHON='C:\Users\daish\AppData\Local\Python\pythoncore-3.14-6
   --format human
 ```
 
-The included post-task fixture intentionally triggers an advisory IRQL warning through `KeWaitForSingleObject` in a dispatch-level code sample.
+The included IRQL post-task fixture intentionally triggers an IRQL violation through `KeWaitForSingleObject` in a dispatch-level code sample.
+
+The contract now also marks:
+
+- `KD-002`
+- `KD-003`
+
+as `hard_stop_rules`, so framework-side domain validator violations for those
+rule IDs now escalate into blocking `post_task_check` errors when enforcement routing is enabled.
 
 The repository now includes two post-task baselines:
 
 - `fixtures/irql_violation.checks.json`
-  - expected result: advisory `KD-IRQL-001` warning
+  - expected result: blocking `KD-IRQL-001` error via `KD-002` hard-stop enforcement
 - `fixtures/irql_compliant.checks.json`
   - expected result: no domain-validator IRQL violation
 - `fixtures/pool_violation.checks.json`
