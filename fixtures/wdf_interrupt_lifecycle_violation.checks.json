@@ -1,0 +1,14 @@
+{
+  "_comment": "Regression fixture: EVT_WDF_INTERRUPT_ENABLE calling KeWaitForSingleObject at DIRQL — must trigger KD-DPC-001 violation.",
+  "driver_code": "EVT_WDF_INTERRUPT_ENABLE  MyBadInterruptEnable;\n\nNTSTATUS\nMyBadInterruptEnable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    // BUG: blocking wait inside interrupt-enable callback (DIRQL)\n    KEVENT event;\n    KeInitializeEvent(&event, NotificationEvent, FALSE);\n    KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);\n    return STATUS_SUCCESS;\n}\n",
+  "checks": {
+    "driver_code": "EVT_WDF_INTERRUPT_ENABLE  MyBadInterruptEnable;\n\nNTSTATUS\nMyBadInterruptEnable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    KEVENT event;\n    KeInitializeEvent(&event, NotificationEvent, FALSE);\n    KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);\n    return STATUS_SUCCESS;\n}\n"
+  },
+  "test_names": [
+    "driver_tests::test_wdf_interrupt_enable_blocking_api_violation"
+  ],
+  "diagnostics": [],
+  "summary": { "failed": 1 },
+  "warnings": [],
+  "errors": []
+}

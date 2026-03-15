@@ -134,10 +134,16 @@ _WDF_DPC_TYPES = {
     "PROGRAM_DMA",
     "INTERRUPT_WORKITEM",   # also runs at PASSIVE but involves DPC handoff; treat as dpc
 }
-# DIRQL (above DISPATCH_LEVEL)
+# DIRQL (above DISPATCH_LEVEL).
+# NOTE: 'isr' here means "interrupt-related callback family" for policy
+# classification purposes, not narrowly the ISR entry point.
+# INTERRUPT_ENABLE/DISABLE are called with interrupts disabled at DIRQL
+# (same execution context as INTERRUPT_ISR), so they belong in this family.
 _WDF_ISR_TYPES = {
     "INTERRUPT_ISR",
     "INTERRUPT_SYNCHRONIZE",
+    "INTERRUPT_ENABLE",
+    "INTERRUPT_DISABLE",
 }
 
 

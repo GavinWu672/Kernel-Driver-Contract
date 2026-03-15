@@ -1,0 +1,14 @@
+{
+  "_comment": "Regression fixture: EVT_WDF_INTERRUPT_ENABLE and EVT_WDF_INTERRUPT_DISABLE are called at DIRQL (interrupt-related family). They must NOT call blocking APIs. This fixture verifies the dpc_isr_validator treats them as isr-family.",
+  "driver_code": "#pragma alloc_text(PAGE, DriverEntry)\n\nEVT_WDF_INTERRUPT_ENABLE  MyInterruptEnable;\nEVT_WDF_INTERRUPT_DISABLE MyInterruptDisable;\nEVT_WDF_INTERRUPT_ISR     MyInterruptIsr;\n\nNTSTATUS\nMyInterruptEnable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    // Called at DIRQL — enable hardware interrupt\n    UNREFERENCED_PARAMETER(Interrupt);\n    UNREFERENCED_PARAMETER(AssociatedDevice);\n    WRITE_REGISTER_ULONG(&HwRegs->InterruptEnable, 1);\n    return STATUS_SUCCESS;\n}\n\nNTSTATUS\nMyInterruptDisable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    // Called at DIRQL — disable hardware interrupt\n    UNREFERENCED_PARAMETER(Interrupt);\n    UNREFERENCED_PARAMETER(AssociatedDevice);\n    WRITE_REGISTER_ULONG(&HwRegs->InterruptEnable, 0);\n    return STATUS_SUCCESS;\n}\n\nBOOLEAN\nMyInterruptIsr(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ ULONG        MessageID\n)\n{\n    UNREFERENCED_PARAMETER(MessageID);\n    WdfInterruptQueueDpcForIsr(Interrupt);\n    return TRUE;\n}\n",
+  "checks": {
+    "driver_code": "#pragma alloc_text(PAGE, DriverEntry)\n\nEVT_WDF_INTERRUPT_ENABLE  MyInterruptEnable;\nEVT_WDF_INTERRUPT_DISABLE MyInterruptDisable;\nEVT_WDF_INTERRUPT_ISR     MyInterruptIsr;\n\nNTSTATUS\nMyInterruptEnable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    UNREFERENCED_PARAMETER(Interrupt);\n    UNREFERENCED_PARAMETER(AssociatedDevice);\n    WRITE_REGISTER_ULONG(&HwRegs->InterruptEnable, 1);\n    return STATUS_SUCCESS;\n}\n\nNTSTATUS\nMyInterruptDisable(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ WDFDEVICE    AssociatedDevice\n)\n{\n    UNREFERENCED_PARAMETER(Interrupt);\n    UNREFERENCED_PARAMETER(AssociatedDevice);\n    WRITE_REGISTER_ULONG(&HwRegs->InterruptEnable, 0);\n    return STATUS_SUCCESS;\n}\n\nBOOLEAN\nMyInterruptIsr(\n    _In_ WDFINTERRUPT Interrupt,\n    _In_ ULONG        MessageID\n)\n{\n    UNREFERENCED_PARAMETER(MessageID);\n    WdfInterruptQueueDpcForIsr(Interrupt);\n    return TRUE;\n}\n"
+  },
+  "test_names": [
+    "driver_tests::test_wdf_interrupt_enable_disable_no_blocking_apis"
+  ],
+  "diagnostics": [],
+  "summary": { "failed": 0 },
+  "warnings": [],
+  "errors": []
+}
