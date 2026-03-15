@@ -1,0 +1,55 @@
+{
+  "source": "external/windows-driver-samples/usb/kmdf_fx2/driver/ioctl.c",
+  "scope": "callback_role_classification",
+  "notes": "KMDF USB fx2 IOCTL dispatch and internal helpers. OsrFxEvtIoDeviceControl is EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL (registered in header). Internal helpers ResetPipe/StopAllPipes/etc. have no EVT_WDF declarations. No spinlocks — spinlock heuristic has no opportunity to fire. Confirms lock-free KMDF helpers are correctly classified as 'other' without needing heuristic suppression.",
+  "functions": {
+    "OsrFxEvtIoDeviceControl": {
+      "label": "other",
+      "notes": "EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL — I/O queue IOCTL dispatch callback. IRQL depends on queue dispatch type (typically PASSIVE_LEVEL for sequential queue). Out of scope for isr/dpc classification. Correctly classified via WDF registry."
+    },
+    "ResetPipe": {
+      "label": "other",
+      "notes": "Internal helper: resets a USB pipe. Called from IOCTL handler. No spinlock. No WDF callback declaration."
+    },
+    "StopAllPipes": {
+      "label": "other",
+      "notes": "Internal helper: stops all USB pipes. No spinlock."
+    },
+    "StartAllPipes": {
+      "label": "other",
+      "notes": "Internal helper: starts all USB pipes. No spinlock."
+    },
+    "ResetDevice": {
+      "label": "other",
+      "notes": "Internal helper: resets the USB device. No spinlock."
+    },
+    "ReenumerateDevice": {
+      "label": "other",
+      "notes": "Internal helper: triggers re-enumeration via IOCTL. No spinlock."
+    },
+    "GetBarGraphState": {
+      "label": "other",
+      "notes": "Internal helper: reads bar graph LED state from device. No spinlock."
+    },
+    "SetBarGraphState": {
+      "label": "other",
+      "notes": "Internal helper: sets bar graph LED state on device. No spinlock."
+    },
+    "GetSevenSegmentState": {
+      "label": "other",
+      "notes": "Internal helper: reads seven-segment display state. No spinlock."
+    },
+    "SetSevenSegmentState": {
+      "label": "other",
+      "notes": "Internal helper: sets seven-segment display state. No spinlock."
+    },
+    "GetSwitchState": {
+      "label": "other",
+      "notes": "Internal helper: reads DIP switch state from device. No spinlock."
+    },
+    "OsrUsbIoctlGetInterruptMessage": {
+      "label": "other",
+      "notes": "Internal helper: retrieves queued interrupt message for IOCTL_OSRUSBFX2_GET_INTERRUPT_MESSAGE. No spinlock. Not a registered WDF callback."
+    }
+  }
+}

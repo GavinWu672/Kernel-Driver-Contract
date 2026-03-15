@@ -1,0 +1,19 @@
+{
+  "source": "external/windows-driver-samples/usb/kmdf_fx2/driver/interrupt.c",
+  "scope": "callback_role_classification",
+  "notes": "KMDF USB fx2 interrupt endpoint handling. Uses WDF USB continuous reader model — interrupt pipe data is delivered at PASSIVE_LEVEL, not via traditional hardware ISR/DPC. No spinlocks used anywhere in the driver. This file confirms: (1) EVT_WDF_USB_READER_COMPLETION_ROUTINE correctly classified as 'other' via registry; (2) spinlock heuristic has no opportunity to misfire (lock-free driver). Zero FP is correct here, not a signal of heuristic quality.",
+  "functions": {
+    "OsrFxConfigContReaderForInterruptEndPoint": {
+      "label": "other",
+      "notes": "_IRQL_requires_(PASSIVE_LEVEL). Init helper that configures the continuous reader on the interrupt endpoint. Called from PrepareHardware. Not a registered callback itself."
+    },
+    "OsrFxEvtUsbInterruptPipeReadComplete": {
+      "label": "other",
+      "notes": "EVT_WDF_USB_READER_COMPLETION_ROUTINE — called by the USB continuous reader when interrupt pipe data arrives. Runs at PASSIVE_LEVEL (continuous reader model, not hardware ISR). Not a classical ISR; USB interrupt endpoint != hardware interrupt line."
+    },
+    "OsrFxEvtUsbInterruptReadersFailed": {
+      "label": "other",
+      "notes": "EVT_WDF_USB_READERS_FAILED — called when the continuous reader fails. PASSIVE_LEVEL. Error recovery callback."
+    }
+  }
+}

@@ -23,15 +23,21 @@ Measured against manually verified ground truth. Four files across three differe
 |------|--------------|-------------|-----------|----------------|
 | `pcidrv/HW/isrdpc.c` | KMDF network | 11 | 11/11 (100%) | 11/11 (100%) |
 | `pcidrv/HW/nic_send.c` | KMDF network | 11 | 11/11 (100%) | 11/11 (100%) |
+| `pcidrv/HW/nic_init.c` | KMDF network | 23 | 23/23 (100%) | 23/23 (100%) |
+| `pcidrv/HW/nic_pm.c` | KMDF network | 18 | 18/18 (100%) | 16/18 (89%) |
+| `pcidrv/HW/nic_recv.c` | KMDF network | 5 | 5/5 (100%) | 3/5 (60%) |
+| `pcidrv/HW/routines.c` | KMDF network | 8 | 8/8 (100%) | 7/8 (88%) |
 | `kbfiltr/sys/kbfiltr.c` | WDM keyboard filter | 8 | 8/8 (100%) | 6/8 (75%) |
 | `cancel/sys/cancel.c` | WDM cancel-safe queue | 12 | 12/12 (100%) | 9/12 (75%) |
-| **Aggregate** | | **42** | **42/42 (100%)** | **37/42 (88.1%)** |
+| `kmdf_fx2/interrupt.c` | KMDF USB | 3 | 3/3 (100%) | 3/3 (100%) |
+| `kmdf_fx2/ioctl.c` | KMDF USB | 12 | 12/12 (100%) | 12/12 (100%) |
+| **Aggregate** | | **111** | **111/111 (100%)** | **101/111 (91.0%)** |
 
 **By driver family:**
 
 | Family | Files | Extraction | Classification |
 |--------|-------|-----------|----------------|
-| KMDF (EVT_WDF_* pattern) | 2 | 22/22 (100%) | 22/22 (100%) |
+| KMDF (EVT_WDF_* pattern) | 8 | 73/73 (100%) | 68/73 (93.2%) |
 | WDM (function-pointer cast) | 2 | 20/20 (100%) | 15/20 (75%) |
 
 Aggregate per-label (4-file batch):
@@ -47,6 +53,8 @@ Aggregate per-label (4-file batch):
 
 All 5 false negatives share the same root cause: **WDM function-pointer cast registration**.
 
+**WDM cast FN (5) — structural, v2:**
+
 | Function | File | Expected | Got | Registration pattern |
 |----------|------|----------|-----|---------------------|
 | `KbFilter_IsrHook` | kbfiltr.c | isr | other | `(PI8042_KEYBOARD_ISR) KbFilter_IsrHook` |
@@ -54,6 +62,18 @@ All 5 false negatives share the same root cause: **WDM function-pointer cast reg
 | `CsampCreateClose` | cancel.c | dispatch | other | `MajorFunction[IRP_MJ_CREATE] = CsampCreateClose` |
 | `CsampRead` | cancel.c | dispatch | other | `MajorFunction[IRP_MJ_READ] = CsampRead` |
 | `CsampCleanup` | cancel.c | dispatch | other | `MajorFunction[IRP_MJ_CLEANUP] = CsampCleanup` |
+
+**Spinlock heuristic-only FP (5) — pcidrv-specific, not yet proven KMDF-wide:**
+
+| Function | File | Expected | Got | Why heuristic fires |
+|----------|------|----------|-----|---------------------|
+| `NICHandleRecvInterrupt` | nic_recv.c | other | dispatch | Internal helper called with Rcv spinlock held |
+| `NICServiceReadIrps` | nic_recv.c | other | dispatch | Called from NICHandleRecvInterrupt (spinlock context) |
+| `MPSetPowerD0` | nic_pm.c | other | dispatch | Acquires spinlock internally |
+| `NICAddWakeUpPattern` | nic_pm.c | other | dispatch | Acquires spinlock internally |
+| `DumpStatsCounters` | routines.c | other | dispatch | Acquires WdfSpinLock to read stats |
+
+**Note on kmdf_fx2:** The USB fx2 driver uses zero spinlocks — spinlock heuristic has no opportunity to fire. Zero FP result is correct but does not prove the heuristic is well-calibrated; it only confirms lock-free KMDF drivers work correctly.
 
 **Scanner's WDF registry approach resolves KMDF `EVT_WDF_*` forward declarations across files.
 It cannot resolve WDM-style function pointer casts or `MajorFunction[]` struct-field assignments.**
@@ -92,6 +112,7 @@ Three samples confirmed KMDF detection is complete; two samples confirmed WDM fu
 | Gap | Severity | Notes |
 |-----|----------|-------|
 | WDM function-pointer cast classification | High / accepted | Structural; v1 is KMDF-first; WDM support is v2 work |
+| Spinlock heuristic-only FP on pcidrv helpers | Medium / under observation | 5 FP in pcidrv helper functions; not observed in fx2 (lock-free); need a KMDF driver with spinlocks but non-pcidrv before deciding to modify heuristic |
 | `dispatch` recall = 0.62 (aggregate) | Known, accepted for WDM | 100% on KMDF; WDM MajorFunction[] is out-of-scope for v1 |
 | `dpc`/`isr` recall = 0.75 (aggregate) | Known, accepted for WDM | 100% on KMDF; WDM cast gap documented |
 
@@ -106,10 +127,10 @@ python check_precision.py --batch ground_truth/*.json \
     --min-coverage 1.0 --min-accuracy 0.85
 ```
 
-| Metric | KMDF only | Aggregate (all 4 files) | Minimum enforced |
-|--------|-----------|------------------------|-----------------|
+| Metric | KMDF (8 files) | Aggregate (10 files) | Minimum enforced |
+|--------|---------------|---------------------|-----------------|
 | Extraction coverage | 100.0% | 100.0% | 100.0% |
-| Classification accuracy | 100.0% | 88.1% | 85.0% |
+| Classification accuracy | 93.2% | 91.0% | 85.0% |
 
 The 85% minimum enforces regression detection across the full GT set while honestly reflecting the WDM structural gap. The KMDF path (100%) is the primary quality signal.
 
