@@ -31,10 +31,38 @@ _FUNC_DEF = re.compile(
 )
 _PAGED_CODE_CALL = re.compile(r"\bPAGED_CODE\s*\(\s*\)")
 
-# Patterns that indicate a clearly non-pageable context in the same snippet
+# Patterns that indicate a clearly non-pageable context
 _NONPAGEABLE_HINTS = re.compile(
     r"\b(KeAcquireSpinLock|KeRaiseIrql|DISPATCH_LEVEL|KeSynchronizeExecution)\b"
 )
+
+# Broad function-definition opener: captures the function name
+_FUNC_OPENER = re.compile(
+    r"""
+    ^(?:[\w\s\*]+?)          # return type (non-greedy)
+    \b(\w+)\s*               # function name (captured)
+    \([^)]*\)                # parameter list
+    (?:\s*\w+)*\s*           # optional SAL / calling-convention suffixes
+    \{                       # opening brace
+    """,
+    re.VERBOSE | re.MULTILINE,
+)
+
+
+def _iter_function_bodies(code: str):
+    """Yield (func_name, body_text) for each top-level function in code."""
+    for m in _FUNC_OPENER.finditer(code):
+        name = m.group(1)
+        brace_start = m.end() - 1
+        depth = 0
+        for i, ch in enumerate(code[brace_start:], brace_start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    yield name, code[brace_start: i + 1]
+                    break
 
 
 def _functions_in_page_section(code: str) -> set[str]:
@@ -100,13 +128,16 @@ class PageableSectionValidator(DomainValidator):
                     "but lacks PAGED_CODE() at entry"
                 )
 
-        # Check 2: PAGED_CODE() in a clearly non-pageable context
-        if _PAGED_CODE_CALL.search(code) and _NONPAGEABLE_HINTS.search(code):
-            violations.append(
-                "KD-PAGE-002: PAGED_CODE() detected in code containing "
-                "non-pageable IRQL hints (KeAcquireSpinLock / DISPATCH_LEVEL). "
-                "This will bugcheck at runtime if paged memory is touched."
-            )
+        # Check 2: PAGED_CODE() and non-pageable hints in the SAME function body.
+        # Checking file-level causes false positives when pageable and
+        # non-pageable functions coexist in the same translation unit.
+        for func_name, body in _iter_function_bodies(code):
+            if _PAGED_CODE_CALL.search(body) and _NONPAGEABLE_HINTS.search(body):
+                violations.append(
+                    f"KD-PAGE-002: '{func_name}' contains both PAGED_CODE() and "
+                    "non-pageable IRQL hints (KeAcquireSpinLock / DISPATCH_LEVEL) "
+                    "in the same function body. This will bugcheck at runtime."
+                )
 
         # Check 3: PAGED_CODE() without any alloc_text(PAGE, ...) pragma in snippet
         if _PAGED_CODE_CALL.search(code) and not paged_funcs:
