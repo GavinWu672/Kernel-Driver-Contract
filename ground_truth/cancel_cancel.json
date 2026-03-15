@@ -1,0 +1,55 @@
+{
+  "source": "external/wds2/general/cancel/sys/cancel.c",
+  "scope": "callback_role_classification",
+  "notes": "Pure WDM cancel-safe IRP queue driver. Callbacks registered via DriverObject->MajorFunction[] assignment and PsCreateSystemThread — both are WDM function-pointer registration patterns invisible to the scanner's EVT_WDF registry approach. This file is used as evidence for/against whether the WDM cast detection gap is universal or kbfiltr-specific.",
+  "functions": {
+    "DriverEntry": {
+      "label": "other",
+      "notes": "DRIVER_INITIALIZE — entry point, PASSIVE_LEVEL"
+    },
+    "CsampCreateClose": {
+      "label": "dispatch",
+      "notes": "Registered as MajorFunction[IRP_MJ_CREATE] and MajorFunction[IRP_MJ_CLOSE]. WDM IRP dispatch routine. Scanner expected to misclassify as 'other' — WDM MajorFunction[] assignment not tracked."
+    },
+    "CsampRead": {
+      "label": "dispatch",
+      "notes": "Registered as MajorFunction[IRP_MJ_READ]. WDM IRP dispatch routine. Same blind spot as CsampCreateClose."
+    },
+    "CsampCleanup": {
+      "label": "dispatch",
+      "notes": "Registered as MajorFunction[IRP_MJ_CLEANUP]. WDM IRP dispatch routine. Same blind spot."
+    },
+    "CsampUnload": {
+      "label": "other",
+      "notes": "DriverObject->DriverUnload — driver unload routine, PASSIVE_LEVEL. Not an interrupt-path callback; out of isr/dpc/dispatch scope."
+    },
+    "CsampPollingThread": {
+      "label": "other",
+      "notes": "Registered via PsCreateSystemThread — KSTART_ROUTINE, runs at PASSIVE_LEVEL as a system thread. Not an interrupt callback; correct label is 'other' regardless of WDM cast gap."
+    },
+    "CsampPollDevice": {
+      "label": "other",
+      "notes": "Internal polling helper called from CsampPollingThread. Not a registered callback."
+    },
+    "CsampInsertIrp": {
+      "label": "other",
+      "notes": "IoCsq InsertIrp callback — runs at DISPATCH_LEVEL (queue spinlock held). Not an IRP dispatch routine in the MajorFunction sense; queue management callback, out of scope for isr/dpc/dispatch classification."
+    },
+    "CsampRemoveIrp": {
+      "label": "other",
+      "notes": "IoCsq RemoveIrp callback — DISPATCH_LEVEL. Same rationale as CsampInsertIrp."
+    },
+    "CsampPeekNextIrp": {
+      "label": "other",
+      "notes": "IoCsq PeekNextIrp callback — DISPATCH_LEVEL. Same rationale."
+    },
+    "CsampReleaseLock": {
+      "label": "other",
+      "notes": "IoCsq ReleaseLock callback — releases the queue spinlock. DISPATCH_LEVEL. Queue management, out of scope."
+    },
+    "CsampCompleteCanceledIrp": {
+      "label": "other",
+      "notes": "IoCsq CompleteCancelledIrp callback — called when IRP is cancelled. Not an interrupt-path callback."
+    }
+  }
+}
