@@ -3,10 +3,14 @@ image: python:3.11
 stages:
   - selftest
   - scan
+  - precision
 
 variables:
   SCAN_OUT_PR:   scan_output/mr
   SCAN_OUT_FULL: scan_output/full
+  # Precision regression thresholds — raise these as ground truth expands
+  PRECISION_MIN_COVERAGE: "1.0"
+  PRECISION_MIN_ACCURACY: "0.90"
 
 # ── Stage 1: Fixture self-test — always runs ─────────────────────────────────
 fixture-selftest:
@@ -39,6 +43,26 @@ fixture-selftest:
     reports:
       junit: fixture_results.json
     expire_in: 7 days
+
+# ── Stage 1b: Precision regression gate — push to main only ──────────────────
+precision-baseline:
+  stage: selftest
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PIPELINE_SOURCE == "push"'
+  script:
+    - |
+      python check_precision.py \
+        --batch ground_truth/*.json \
+        --wdf-dirs external/wds2/general/pcidrv/kmdf/HW \
+                   external/wds2/input/kbfiltr/sys \
+        --min-coverage "$PRECISION_MIN_COVERAGE" \
+        --min-accuracy "$PRECISION_MIN_ACCURACY"
+  artifacts:
+    when: always
+    paths:
+      - ground_truth/
+    expire_in: 30 days
 
 # ── Stage 2a: Scan changed files on Merge Request ────────────────────────────
 mr-source-scan:

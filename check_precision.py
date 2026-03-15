@@ -271,6 +271,20 @@ def _parse_args():
     )
     p.add_argument("--json", action="store_true", help="Emit machine-readable JSON result")
     p.add_argument("--verbose", action="store_true", help="Show per-function detail")
+    p.add_argument(
+        "--min-coverage",
+        metavar="FLOAT",
+        type=float,
+        default=None,
+        help="Fail if batch extraction coverage falls below this threshold (0.0–1.0)",
+    )
+    p.add_argument(
+        "--min-accuracy",
+        metavar="FLOAT",
+        type=float,
+        default=None,
+        help="Fail if batch classification accuracy falls below this threshold (0.0–1.0)",
+    )
     return p.parse_args()
 
 
@@ -310,6 +324,31 @@ def main():
 
     if len(results) > 1:
         _print_batch_summary(results)
+
+    # Threshold enforcement (overrides per-file pass/fail for CI gate use)
+    if args.min_coverage is not None or args.min_accuracy is not None:
+        total_gt = sum(r["phase_a"]["gt_total"] for r in results)
+        total_found = sum(r["phase_a"]["found"] for r in results)
+        total_correct = sum(r["phase_b"]["correct"] for r in results)
+        batch_coverage = total_found / total_gt if total_gt else 1.0
+        batch_accuracy = total_correct / total_found if total_found else 1.0
+
+        threshold_pass = True
+        if args.min_coverage is not None and batch_coverage < args.min_coverage:
+            print(
+                f"\nTHRESHOLD FAIL: extraction coverage {batch_coverage:.3f} "
+                f"< required {args.min_coverage:.3f}"
+            )
+            threshold_pass = False
+        if args.min_accuracy is not None and batch_accuracy < args.min_accuracy:
+            print(
+                f"\nTHRESHOLD FAIL: classification accuracy {batch_accuracy:.3f} "
+                f"< required {args.min_accuracy:.3f}"
+            )
+            threshold_pass = False
+        if threshold_pass and (args.min_coverage is not None or args.min_accuracy is not None):
+            print("\nTHRESHOLD PASS: all batch metrics meet required minimums")
+        sys.exit(0 if threshold_pass else 1)
 
     sys.exit(0 if all_pass else 1)
 

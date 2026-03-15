@@ -1,0 +1,39 @@
+{
+  "source": "external/wds2/input/kbfiltr/sys/kbfiltr.c",
+  "scope": "callback_role_classification",
+  "notes": "WDM upper-filter driver for PS/2 keyboard (KMDF wrapper). Uses i8042prt hook mechanism — callbacks are registered via WDM-style function pointer casts (PI8042_KEYBOARD_ISR, PSERVICE_CALLBACK_ROUTINE), not EVT_WDF_* forward declarations. Scanner cannot resolve these from header files, so IsrHook and ServiceCallback are expected false negatives that expose a fundamental WDM-cast detection gap.",
+  "functions": {
+    "DriverEntry": {
+      "label": "other",
+      "notes": "DRIVER_INITIALIZE — entry point, PASSIVE_LEVEL, not a recurring callback"
+    },
+    "KbFilter_EvtDeviceAdd": {
+      "label": "other",
+      "notes": "EVT_WDF_DRIVER_DEVICE_ADD — device lifecycle callback, PASSIVE_LEVEL. Declared in kbfiltr.h, correctly mapped by WDF registry. Out of scope for isr/dpc/dispatch classification."
+    },
+    "KbFilter_EvtIoDeviceControlFromRawPdo": {
+      "label": "other",
+      "notes": "EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL — I/O queue callback from raw PDO interface. IRQL depends on queue config. Out of scope for callback_role_classification."
+    },
+    "KbFilter_EvtIoInternalDeviceControl": {
+      "label": "other",
+      "notes": "EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL — handles IOCTL_INTERNAL_I8042_HOOK_KEYBOARD among others. I/O queue callback, out of scope."
+    },
+    "KbFilter_InitializationRoutine": {
+      "label": "other",
+      "notes": "PI8042_KEYBOARD_INITIALIZATION_ROUTINE — called after keyboard reset/init sequence. Runs synchronously in init path, not in interrupt context. No EVT_WDF declaration; scanner cannot detect. Correct label is 'other' regardless."
+    },
+    "KbFilter_IsrHook": {
+      "label": "isr",
+      "notes": "PI8042_KEYBOARD_ISR — comment says 'called at the beginning of processing of the kb interrupt', i.e., DIRQL. Registered via: hookKeyboard->IsrRoutine = (PI8042_KEYBOARD_ISR) KbFilter_IsrHook. WDM cast — no EVT_WDF declaration; scanner labels 'other'. Known false negative: WDM function-pointer cast pattern not detectable from header analysis."
+    },
+    "KbFilter_ServiceCallback": {
+      "label": "dpc",
+      "notes": "PSERVICE_CALLBACK_ROUTINE — keyboard class service callback, called at DISPATCH_LEVEL in the interrupt service path (from keyboard class DPC). Registered via: connectData->ClassService = KbFilter_ServiceCallback. WDM cast — no EVT_WDF declaration; scanner labels 'other'. Known false negative: same WDM-cast detection gap as IsrHook."
+    },
+    "KbFilterRequestCompletionRoutine": {
+      "label": "other",
+      "notes": "EVT_WDF_REQUEST_COMPLETION_ROUTINE — I/O request completion callback. Can run at DISPATCH_LEVEL but is an I/O completion callback, not a DPC/ISR in the interrupt-path sense. Out of scope for callback_role_classification."
+    }
+  }
+}
