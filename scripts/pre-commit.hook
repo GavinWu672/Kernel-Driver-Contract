@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Kernel Driver Contract — pre-commit hook
+#
+# Scans staged .c/.h files and runs all validators.
+# Hard-stop violations block the commit (exit 1).
+#
+# Install: bash scripts/install-hooks.sh
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCAN_OUT="$REPO_ROOT/.git/kernel-driver-scan"
+
+# Collect staged C/H files
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|h)$' || true)
+
+if [ -z "$STAGED" ]; then
+    exit 0  # nothing to check
+fi
+
+echo "[kernel-driver-contract] Scanning staged files..."
+
+mkdir -p "$SCAN_OUT"
+# Clean previous run
+rm -f "$SCAN_OUT"/*.checks.json
+
+while IFS= read -r f; do
+    [ -f "$REPO_ROOT/$f" ] || continue
+    python "$REPO_ROOT/scan_source.py" "$REPO_ROOT/$f" \
+        --output-dir "$SCAN_OUT" 2>/dev/null
+done <<< "$STAGED"
+
+if [ -z "$(ls -A "$SCAN_OUT" 2>/dev/null)" ]; then
+    echo "[kernel-driver-contract] No payloads generated — skipping."
+    exit 0
+fi
+
+python "$REPO_ROOT/run_validators.py" "$SCAN_OUT/" 2>&1
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+    echo ""
+    echo "[kernel-driver-contract] ❌ Hard-stop violation detected."
+    echo "    Fix the violations above before committing."
+    exit 1
+fi
+
+echo "[kernel-driver-contract] ✅ All hard-stop checks passed."
+exit 0
