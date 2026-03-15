@@ -197,8 +197,131 @@ In drivers that mix KMDF callbacks with legacy NDIS-style explicit spinlock mana
 
 ---
 
-## 6. Handling Suspected False Positives
-## 6. 處理疑似 False Positive
+## 6. AI-Governed Development Mode
+## 6. AI 治理開發模式
+
+**English**
+
+The recommended integration model combines this contract with the [ai-governance-framework](https://github.com/GavinWu672/ai-governance-framework). In this mode, the kernel-driver contract is loaded as a domain plugin into the framework's session lifecycle. Validators run automatically at pre/post-task checkpoints during AI-assisted development — no manual invocation required.
+
+**Why this mode is preferred over standalone**
+
+In standalone mode, a developer must remember to run `scan_source.py` and `run_validators.py` after each change. In AI-governed mode, the framework enforces this automatically: the AI session cannot complete a task that produces a hard-stop violation. The governance constraint is structural, not procedural.
+
+**How it works**
+
+```
+AI session starts
+    └─▶ framework loads contract.yaml from this repo
+            └─▶ documents (STATUS.md, AGENTS.md, standards mapping)
+                 injected into session context
+            └─▶ AGENTS.md behavior constraints applied to AI
+
+Developer asks AI to modify driver code
+    └─▶ pre-task: framework checks governance preconditions
+
+AI proposes changes
+    └─▶ post-task: framework runs domain validators against changed files
+            └─▶ HARD-STOP → task blocked, AI must fix before proceeding
+            └─▶ ADVISORY → flagged in session, developer reviews
+            └─▶ PASS → task completes normally
+```
+
+**Setup**
+
+1. Clone both repositories side by side (or use the path your team configures):
+
+```bash
+git clone https://github.com/GavinWu672/ai-governance-framework
+git clone https://github.com/GavinWu672/Kernel-Driver-Contract
+```
+
+2. Register the kernel-driver contract with the framework:
+
+```bash
+cd ai-governance-framework
+python governance_tools/external_contract_policy_index.py \
+    --repo ../Kernel-Driver-Contract \
+    --format markdown
+```
+
+If all validator paths and document paths resolve correctly, the domain will appear in the enforcement matrix as `kernel-driver` with `high` risk tier and `hard-stop` enforcement.
+
+3. Start an AI-governed session following the framework's session startup procedure. The kernel-driver contract will be loaded automatically when the session domain is `kernel-driver`.
+
+**What the AI session sees**
+
+Once loaded, the session context includes:
+
+- `AGENTS.md` — AI behavior constraints (no blocking calls at IRQL > PASSIVE, no bypassing validator failures, conservative unknown-IRQL policy)
+- `STATUS.md` — current v1 capability boundary and known limitations
+- `docs/microsoft-standards-mapping.md` — DV/SDV rule traceability
+
+The AI is constrained to follow these documents throughout the session. Any suggestion that would violate a hard-stop rule will be blocked at the post-task validation step.
+
+**中文**
+
+推薦的整合模式是將本 contract 與 [ai-governance-framework](https://github.com/GavinWu672/ai-governance-framework) 搭配使用。在此模式下，kernel-driver contract 作為 domain plugin 被載入 framework 的 session 生命週期。Validators 在 AI 輔助開發的 pre/post-task 檢查點自動執行，不需要手動呼叫。
+
+**為什麼此模式優於 standalone**
+
+Standalone 模式下，開發者每次修改後需要記得手動跑 `scan_source.py` 和 `run_validators.py`。AI 治理模式下，framework 自動強制執行：AI session 無法完成產生 hard-stop 違規的任務。治理約束是結構性的，不依賴流程紀律。
+
+**運作方式**
+
+```
+AI session 啟動
+    └─▶ framework 從本 repo 載入 contract.yaml
+            └─▶ 文件（STATUS.md、AGENTS.md、standards mapping）
+                 注入 session 上下文
+            └─▶ AGENTS.md 行為約束套用至 AI
+
+開發者請 AI 修改 driver code
+    └─▶ pre-task：framework 檢查治理前提條件
+
+AI 提出變更
+    └─▶ post-task：framework 對變更檔案執行 domain validators
+            └─▶ HARD-STOP → 任務阻斷，AI 必須修復後才能繼續
+            └─▶ ADVISORY → 在 session 中標記，開發者審查
+            └─▶ PASS → 任務正常完成
+```
+
+**設定步驟**
+
+1. 將兩個 repo 並排 clone（或依團隊配置的路徑）：
+
+```bash
+git clone https://github.com/GavinWu672/ai-governance-framework
+git clone https://github.com/GavinWu672/Kernel-Driver-Contract
+```
+
+2. 向 framework 注冊 kernel-driver contract：
+
+```bash
+cd ai-governance-framework
+python governance_tools/external_contract_policy_index.py \
+    --repo ../Kernel-Driver-Contract \
+    --format markdown
+```
+
+若所有 validator 路徑與文件路徑均能 resolve，domain 將以 `kernel-driver`、`high` risk tier、`hard-stop` enforcement 出現在 enforcement matrix 中。
+
+3. 依照 framework 的 session 啟動流程開始 AI 治理 session。當 session domain 為 `kernel-driver` 時，kernel-driver contract 將自動載入。
+
+**AI session 看到什麼**
+
+載入後，session 上下文包含：
+
+- `AGENTS.md` — AI 行為約束（IRQL > PASSIVE 時不得呼叫 blocking API、不得繞過 validator failure、未知 IRQL 保守處理）
+- `STATUS.md` — 目前 v1 能力邊界與已知限制
+- `docs/microsoft-standards-mapping.md` — DV/SDV 規則 traceability
+
+AI 在整個 session 中受這些文件約束。任何會觸發 hard-stop 規則的建議，將在 post-task 驗證步驟被阻斷。
+
+---
+
+## 7. Handling Suspected False Positives
+## 7. 處理疑似 False Positive
 
 **English**
 
