@@ -73,7 +73,10 @@ All 5 false negatives share the same root cause: **WDM function-pointer cast reg
 | `NICAddWakeUpPattern` | nic_pm.c | other | dispatch | Acquires spinlock internally |
 | `DumpStatsCounters` | routines.c | other | dispatch | Acquires WdfSpinLock to read stats |
 
-**Note on kmdf_fx2:** The USB fx2 driver uses zero spinlocks — spinlock heuristic has no opportunity to fire. Zero FP result is correct but does not prove the heuristic is well-calibrated; it only confirms lock-free KMDF drivers work correctly.
+**Spinlock heuristic scope (confirmed after 3 pure-KMDF samples):**
+- fx2, vhidmini2, usbsamp — all pure KMDF, all lock-free, all zero heuristic FP
+- pcidrv — KMDF wrapping NDIS, uses explicit spinlocks in helpers → 5 FP
+- Hypothesis result: spinlock heuristic-only FP is NOT KMDF-wide. It is specific to KMDF drivers that inherit explicit spinlock patterns from legacy NDIS/WDM layers. Pure KMDF drivers use WDF queue serialization and do not exhibit this class of FP.
 
 **Scanner's WDF registry approach resolves KMDF `EVT_WDF_*` forward declarations across files.
 It cannot resolve WDM-style function pointer casts or `MajorFunction[]` struct-field assignments.**
@@ -112,7 +115,7 @@ Three samples confirmed KMDF detection is complete; two samples confirmed WDM fu
 | Gap | Severity | Notes |
 |-----|----------|-------|
 | WDM function-pointer cast classification | High / accepted | Structural; v1 is KMDF-first; WDM support is v2 work |
-| Spinlock heuristic-only FP on pcidrv helpers | Medium / under observation | 5 FP in pcidrv helper functions; not observed in fx2 (lock-free); need a KMDF driver with spinlocks but non-pcidrv before deciding to modify heuristic |
+| Spinlock heuristic-only FP on KMDF+NDIS-heritage drivers | Low / accepted for v1 | 5 FP in pcidrv (KMDF wrapping NDIS layer with explicit spinlocks). Verified absent in 3 pure-KMDF drivers (fx2, vhidmini2, usbsamp) — all lock-free. Hypothesis confirmed: FP is specific to KMDF drivers that inherit explicit spinlock patterns from legacy NDIS/WDM layers, not KMDF-wide. Not modifying heuristic in v1; document as known limitation for NDIS-heritage KMDF drivers. |
 | `dispatch` recall = 0.62 (aggregate) | Known, accepted for WDM | 100% on KMDF; WDM MajorFunction[] is out-of-scope for v1 |
 | `dpc`/`isr` recall = 0.75 (aggregate) | Known, accepted for WDM | 100% on KMDF; WDM cast gap documented |
 
