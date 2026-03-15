@@ -3,27 +3,30 @@ plugin_version: "1.0.0"
 framework_interface_version: "1"
 framework_compatible: ">=1.0.0,<2.0.0"
 domain: kernel-driver
-applies_to:
-  - kernel
-  - driver
-  - wdm
-  - wdf
-  - kmdf
+
 documents:
   - KERNEL_DRIVER_CHECKLIST.md
   - KERNEL_DRIVER_ARCHITECTURE.md
-rule_roots:
-  - rules
+  - STATUS.md
+  - docs/microsoft-standards-mapping.md
+
 ai_behavior_override:
   - AGENTS.md
+
+rule_roots:
+  - rules
+
 validators:
   - validators/irql_safety_validator.py
+  - validators/dpc_isr_validator.py
   - validators/pool_type_validator.py
   - validators/sync_primitive_validator.py
-  - validators/dpc_isr_validator.py
   - validators/pageable_section_validator.py
   - validators/dispatch_routine_validator.py
   - validators/static_analysis_validator.py
+
+# The following fields are consumed by the standalone CI runner (run_validators.py)
+# and are not part of the framework plugin interface.
 hard_stop_rules:
   - KD-002
   - KD-003

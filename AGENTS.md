@@ -47,8 +47,21 @@ If any required fact is missing:
 - The agent must not recommend synchronous waits in IRP completion paths.
 - Completion, cancel, and cleanup interactions must be treated as separate review surfaces.
 
+## Validator Failure Policy
+
+- A validator `HARD-STOP` result is a hard constraint. The agent must not reframe, suppress, or work around a hard-stop finding.
+- A validator `ADVISORY` result must be acknowledged and documented if the change proceeds anyway.
+- The agent must not claim a check passed when the validator output is unavailable or skipped.
+
+## Scope Boundary
+
+- This contract is a pre-merge static pattern checker. It is not a substitute for Driver Verifier (DV), Static Driver Verifier (SDV), or HLK/WHCP certification.
+- Passing all validators in this contract does not indicate DV-clean, SDV-clean, or WHQL-ready status.
+- When DV/SDV/HLK results are available, those take precedence over this tool's findings.
+
 ## Related Documents
 
 - `KERNEL_DRIVER_CHECKLIST.md`
 - `KERNEL_DRIVER_ARCHITECTURE.md`
-- `docs/architecture-review.md`
+- `STATUS.md`
+- `docs/microsoft-standards-mapping.md`
