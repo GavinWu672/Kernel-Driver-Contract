@@ -39,3 +39,53 @@
   - pool_type_review
 - Enforcement:
   - advisory
+
+## KD-006 - sync-primitive-irql
+
+- Synchronization primitives must match the IRQL at which they are acquired.
+  - `KMUTEX` / `KeWaitForMutexObject` requires `PASSIVE_LEVEL`; forbidden at `DISPATCH_LEVEL`.
+  - `KEVENT` (synchronization) requires `<= APC_LEVEL`.
+  - `KSPIN_LOCK` / `KeAcquireSpinLock` is the correct primitive at `DISPATCH_LEVEL`.
+  - `EX_PUSH_LOCK` requires `<= APC_LEVEL`.
+- Evidence required:
+  - sync_primitive_review
+- Enforcement:
+  - hard-stop
+
+## KD-007 - dpc-isr-nonblocking
+
+- DPC (`KDEFERRED_ROUTINE`) and ISR (`KSERVICE_ROUTINE`) routines run at `DISPATCH_LEVEL`
+  or higher and must not call blocking, pageable, or wait-based APIs.
+- Evidence required:
+  - dpc_isr_review
+- Enforcement:
+  - hard-stop
+
+## KD-008 - paged-code-annotation
+
+- Functions placed in pageable sections must call `PAGED_CODE()` at entry.
+  Functions in non-pageable sections must NOT call `PAGED_CODE()`.
+  Pageable sections must be bracketed with `#pragma alloc_text(PAGE, ...)`.
+- Evidence required:
+  - pageable_section_review
+- Enforcement:
+  - advisory
+
+## KD-009 - dispatch-routine-registered
+
+- Every IRP major function handled by the driver must be explicitly assigned to
+  `DriverObject->MajorFunction[IRP_MJ_*]`.  Unregistered major functions default
+  to the framework stub and must not silently accept IRPs.
+- Evidence required:
+  - dispatch_registration_review
+- Enforcement:
+  - advisory
+
+## KD-010 - static-analysis-clean
+
+- Driver Verifier, SDV (Static Driver Verifier), and WDK SAL annotation analysis
+  must report no new defects on changed code paths.
+- Evidence required:
+  - static_analysis_output
+- Enforcement:
+  - hard-stop

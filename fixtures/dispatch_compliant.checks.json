@@ -1,0 +1,19 @@
+{
+  "driver_code": "NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath) {\n    UNREFERENCED_PARAMETER(RegistryPath);\n    DriverObject->MajorFunction[IRP_MJ_CREATE]         = DriverCreate;\n    DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DriverClose;\n    DriverObject->MajorFunction[IRP_MJ_CLEANUP]        = DriverCleanup;\n    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DriverDeviceControl;\n    for (ULONG i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {\n        if (!DriverObject->MajorFunction[i]) {\n            DriverObject->MajorFunction[i] = DriverDefaultHandler;\n        }\n    }\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/dispatch_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_dispatch_all_handlers_registered",
+    "driver_tests::test_dispatch_default_stub_covers_unhandled"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms all MajorFunction slots are populated"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

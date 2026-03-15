@@ -1,0 +1,19 @@
+{
+  "driver_code": "NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath) {\n    UNREFERENCED_PARAMETER(RegistryPath);\n    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = NULL;\n    DriverObject->MajorFunction[IRP_MJ_CREATE] = DriverCreate;\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/dispatch_violation.c"
+  ],
+  "test_names": [
+    "driver_tests::test_dispatch_null_handler_rejected",
+    "driver_tests::test_dispatch_missing_cleanup_handler"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms dispatch routine registration reviewed"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

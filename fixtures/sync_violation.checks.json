@@ -1,0 +1,19 @@
+{
+  "dispatch_level_code": "VOID BadSyncRoutine(_In_ PDEVICE_OBJECT DeviceObject) {\n    KIRQL oldIrql;\n    UNREFERENCED_PARAMETER(DeviceObject);\n    KeAcquireSpinLock(&g_SpinLock, &oldIrql);\n    ExAcquireFastMutex(&g_Mutex);\n    ExReleaseFastMutex(&g_Mutex);\n    KeReleaseSpinLock(&g_SpinLock, oldIrql);\n}\n",
+  "driver_code": "VOID BadSyncRoutine(_In_ PDEVICE_OBJECT DeviceObject) {\n    KIRQL oldIrql;\n    UNREFERENCED_PARAMETER(DeviceObject);\n    KeAcquireSpinLock(&g_SpinLock, &oldIrql);\n    ExAcquireFastMutex(&g_Mutex);\n    ExReleaseFastMutex(&g_Mutex);\n    KeReleaseSpinLock(&g_SpinLock, oldIrql);\n}\n",
+  "changed_files": [
+    "fixtures/src/sync_violation.c"
+  ],
+  "test_names": [
+    "driver_tests::test_sync_primitive_irql_mismatch"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms dispatch_level path reviewed"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

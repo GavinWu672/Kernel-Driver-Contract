@@ -1,0 +1,19 @@
+{
+  "driver_code": "#pragma alloc_text(PAGE, DriverReadHandler)\nNTSTATUS DriverReadHandler(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    Irp->IoStatus.Status = STATUS_SUCCESS;\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\nNTSTATUS DispatchHandler(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp) {\n    KIRQL oldIrql;\n    UNREFERENCED_PARAMETER(DeviceObject);\n    KeAcquireSpinLock(&g_Lock, &oldIrql);\n    PAGED_CODE();\n    KeReleaseSpinLock(&g_Lock, oldIrql);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/pageable_violation.c"
+  ],
+  "test_names": [
+    "driver_tests::test_paged_code_annotation_missing",
+    "driver_tests::test_paged_code_at_dispatch_level"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis: PAGED_CODE placement anomaly detected"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

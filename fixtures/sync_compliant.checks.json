@@ -1,0 +1,19 @@
+{
+  "dispatch_level_code": "VOID SafeSyncRoutine(_In_ PDEVICE_OBJECT DeviceObject) {\n    KIRQL oldIrql;\n    UNREFERENCED_PARAMETER(DeviceObject);\n    KeAcquireSpinLock(&g_SpinLock, &oldIrql);\n    g_SharedCounter++;\n    KeReleaseSpinLock(&g_SpinLock, oldIrql);\n}\n",
+  "driver_code": "VOID SafeSyncRoutine(_In_ PDEVICE_OBJECT DeviceObject) {\n    KIRQL oldIrql;\n    UNREFERENCED_PARAMETER(DeviceObject);\n    KeAcquireSpinLock(&g_SpinLock, &oldIrql);\n    g_SharedCounter++;\n    KeReleaseSpinLock(&g_SpinLock, oldIrql);\n}\n",
+  "changed_files": [
+    "fixtures/src/sync_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_sync_primitive_correct_at_dispatch"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms spinlock used correctly at DISPATCH_LEVEL"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

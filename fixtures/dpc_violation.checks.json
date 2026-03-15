@@ -1,0 +1,18 @@
+{
+  "dpc_code": "VOID BadDpcRoutine(\n    _In_     PKDPC  Dpc,\n    _In_opt_ PVOID  DeferredContext,\n    _In_opt_ PVOID  SystemArgument1,\n    _In_opt_ PVOID  SystemArgument2\n) {\n    UNREFERENCED_PARAMETER(Dpc);\n    UNREFERENCED_PARAMETER(DeferredContext);\n    UNREFERENCED_PARAMETER(SystemArgument1);\n    UNREFERENCED_PARAMETER(SystemArgument2);\n    KeWaitForSingleObject(&g_CompletionEvent, Executive, KernelMode, FALSE, NULL);\n}\n",
+  "changed_files": [
+    "fixtures/src/dpc_violation.c"
+  ],
+  "test_names": [
+    "driver_tests::test_dpc_blocking_api_forbidden"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis: KDEFERRED_ROUTINE blocking API detected"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

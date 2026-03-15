@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+"""
+Kernel-driver source scanner.
+
+Scans real *.c / *.h driver source files, classifies each function by its
+IRQL context, and emits .checks.json payloads that run_validators.py can
+consume directly.
+
+Usage:
+  # Scan a directory — one checks.json per .c file written to ./scan_output/
+  python scan_source.py path/to/driver/
+
+  # Scan a single file
+  python scan_source.py path/to/driver/file.c
+
+  # Write output to a custom directory
+  python scan_source.py path/to/driver/ --output-dir my_results/
+
+  # Aggregate all files into one checks.json per directory
+  python scan_source.py path/to/driver/ --aggregate
+
+  # Scan + immediately run validators (no JSON files written)
+  python scan_source.py path/to/driver/ --run
+
+Output format per file (same shape as hand-written fixture files):
+  {
+    "source_file": "<path>",
+    "driver_code":          "<full file text>",
+    "dispatch_level_code":  "<dispatch-level functions concatenated>",
+    "dpc_code":             "<DPC routine functions concatenated>",
+    "isr_code":             "<ISR routine functions concatenated>",
+    "pageable_functions":   ["FuncA", "FuncB"],
+    "dispatch_handlers":    {"IRP_MJ_CREATE": "DriverCreate", ...},
+    "changed_files":        ["<path>"],
+    "diagnostics":          [],
+    "summary":              {"failed": 0},
+    "warnings":             [],
+    "errors":               []
+  }
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import NamedTuple
+
+# ── Regex patterns ────────────────────────────────────────────────────────────
+
+# DPC / ISR function type annotations (in function signature or preceding line)
+_DPC_SIGNATURE = re.compile(
+    r"\b(KDEFERRED_ROUTINE|IO_DPC_ROUTINE|DPC_ROUTINE)\b"
+)
+_ISR_SIGNATURE = re.compile(
+    r"\b(KSERVICE_ROUTINE|KMESSAGE_SERVICE_ROUTINE)\b"
+)
+
+# pageable section marker: #pragma alloc_text(PAGE, FuncName)
+_ALLOC_TEXT_PAGE = re.compile(
+    r"#\s*pragma\s+alloc_text\s*\(\s*PAGE\s*,\s*(\w+)\s*\)", re.IGNORECASE
+)
+
+# dispatch routine registration: DriverObject->MajorFunction[IRP_MJ_*] = Name;
+_MAJOR_FUNC_RE = re.compile(
+    r"DriverObject\s*->\s*MajorFunction\s*\[\s*(IRP_MJ_\w+)\s*\]\s*=\s*(\w+)\s*;",
+    re.MULTILINE,
+)
+
+# DPC registration: KeInitializeDpc(..., Routine, ...)
+_DPC_REGISTRATION = re.compile(
+    r"(?:KeInitializeDpc|IoInitializeDpcRequest|KeInsertQueueDpc)\s*\([^,)]*,\s*(\w+)",
+    re.MULTILINE,
+)
+
+# ISR registration: IoConnectInterrupt(..., ServiceRoutine, ...)
+# ServiceRoutine is the 3rd argument
+_ISR_REGISTRATION = re.compile(
+    r"IoConnectInterrupt\s*\([^,)]+,[^,)]+,\s*(\w+)", re.MULTILINE
+)
+
+# Spinlock usage — heuristic for DISPATCH_LEVEL context inside a function
+_SPINLOCK_USE = re.compile(r"\bKeAcquireSpinLock\b|\bKeAcquireSpinLockAtDpcLevel\b")
+
+# Raise IRQL to DISPATCH
+_RAISE_IRQL = re.compile(r"\bKeRaiseIrql\s*\(\s*DISPATCH_LEVEL")
+
+# Broad function definition pattern (C-style, not C++)
+# Matches:   ReturnType [__stdcall] FuncName(args...) [_SAL_] {
+_FUNC_DEF_RE = re.compile(
+    r"""
+    ^                           # start of line
+    (?:[\w\s\*]+?)              # return type (non-greedy)
+    \b(\w+)\s*                  # function name (captured)
+    \(                          # opening paren
+    [^)]*                       # params (no nested parens needed)
+    \)                          # closing paren
+    (?:\s*\w+)*\s*              # optional SAL / calling-convention suffixes
+    \{                          # opening brace — function body starts
+    """,
+    re.VERBOSE | re.MULTILINE,
+)
+
+
+# ── Function extractor ───────────────────────────────────────────────────────
+
+class FuncInfo(NamedTuple):
+    name: str
+    body: str          # full text from opening '{' to matching '}'
+    start: int         # character offset in file
+
+
+def extract_functions(code: str) -> list[FuncInfo]:
+    """
+    Extract top-level function definitions from C source text.
+    Uses brace-counting; handles nested braces but not preprocessor tricks.
+    """
+    functions: list[FuncInfo] = []
+    for m in _FUNC_DEF_RE.finditer(code):
+        name = m.group(1)
+        brace_start = m.end() - 1  # position of '{'
+        depth = 0
+        end = brace_start
+        for i, ch in enumerate(code[brace_start:], brace_start):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    break
+        body = code[brace_start:end]
+        functions.append(FuncInfo(name=name, body=body, start=m.start()))
+    return functions
+
+
+# ── IRQL classifier ──────────────────────────────────────────────────────────
+
+class FileAnalysis(NamedTuple):
+    path: Path
+    full_text: str
+    pageable_funcs: set[str]
+    dispatch_handlers: dict[str, str]   # IRP_MJ_* → handler name
+    dpc_registered: set[str]            # names registered as DPC callbacks
+    isr_registered: set[str]            # names registered as ISR callbacks
+    functions: list[FuncInfo]
+
+
+def _analyse_file(path: Path) -> FileAnalysis:
+    text = path.read_text(encoding="utf-8", errors="replace")
+
+    pageable = set(_ALLOC_TEXT_PAGE.findall(text))
+    handlers = {m.group(1): m.group(2) for m in _MAJOR_FUNC_RE.finditer(text)}
+    dpc_reg = set(_DPC_REGISTRATION.findall(text))
+    isr_reg = set(_ISR_REGISTRATION.findall(text))
+    funcs = extract_functions(text)
+
+    return FileAnalysis(
+        path=path,
+        full_text=text,
+        pageable_funcs=pageable,
+        dispatch_handlers=handlers,
+        dpc_registered=dpc_reg,
+        isr_registered=isr_reg,
+        functions=funcs,
+    )
+
+
+def _classify_func(func: FuncInfo, analysis: FileAnalysis) -> str:
+    """
+    Returns the IRQL context key for this function:
+      'dpc'      - DPC routine
+      'isr'      - ISR routine
+      'dispatch' - runs at DISPATCH_LEVEL (spinlock-held, KeRaiseIrql, etc.)
+      'driver'   - general driver code (PASSIVE or unknown)
+    """
+    name = func.name
+    body = func.body
+
+    # Look at the ~200 chars before the opening brace for type annotations
+    pre = analysis.full_text[max(0, func.start - 200): func.start]
+
+    if _DPC_SIGNATURE.search(pre) or name in analysis.dpc_registered:
+        return "dpc"
+    if _ISR_SIGNATURE.search(pre) or name in analysis.isr_registered:
+        return "isr"
+    if _SPINLOCK_USE.search(body) or _RAISE_IRQL.search(body):
+        return "dispatch"
+    return "driver"
+
+
+# ── Payload builder ──────────────────────────────────────────────────────────
+
+def build_payload(analysis: FileAnalysis) -> dict:
+    buckets: dict[str, list[str]] = {
+        "dpc": [],
+        "isr": [],
+        "dispatch": [],
+        "driver": [],
+    }
+
+    for func in analysis.functions:
+        key = _classify_func(func, analysis)
+        buckets[key].append(func.body)
+
+    def join(parts: list[str]) -> str:
+        return "\n\n".join(parts)
+
+    payload: dict = {
+        "source_file": str(analysis.path),
+        "driver_code": analysis.full_text,
+        "changed_files": [str(analysis.path)],
+        "pageable_functions": sorted(analysis.pageable_funcs),
+        "dispatch_handlers": analysis.dispatch_handlers,
+        "diagnostics": [],
+        "summary": {"failed": 0},
+        "warnings": [],
+        "errors": [],
+    }
+
+    if buckets["dispatch"]:
+        payload["dispatch_level_code"] = join(buckets["dispatch"])
+    if buckets["dpc"]:
+        payload["dpc_code"] = join(buckets["dpc"])
+    if buckets["isr"]:
+        payload["isr_code"] = join(buckets["isr"])
+
+    # driver_code already contains full text; also provide parsed-only view
+    if buckets["driver"]:
+        payload["driver_functions_code"] = join(buckets["driver"])
+
+    return payload
+
+
+# ── Aggregate builder ─────────────────────────────────────────────────────────
+
+def aggregate_payloads(payloads: list[dict], source_dir: Path) -> dict:
+    """Merge all per-file payloads into one directory-level payload."""
+
+    def merge_key(key: str) -> str:
+        parts = [p[key] for p in payloads if key in p and p[key]]
+        return "\n\n/* --- next file --- */\n\n".join(parts)
+
+    all_files = [f for p in payloads for f in p.get("changed_files", [])]
+    all_pageable = sorted({f for p in payloads for f in p.get("pageable_functions", [])})
+    all_handlers: dict = {}
+    for p in payloads:
+        all_handlers.update(p.get("dispatch_handlers", {}))
+
+    agg: dict = {
+        "source_dir": str(source_dir),
+        "driver_code": merge_key("driver_code"),
+        "changed_files": all_files,
+        "pageable_functions": all_pageable,
+        "dispatch_handlers": all_handlers,
+        "diagnostics": [],
+        "summary": {"failed": 0},
+        "warnings": [],
+        "errors": [],
+    }
+
+    for key in ("dispatch_level_code", "dpc_code", "isr_code"):
+        merged = merge_key(key)
+        if merged:
+            agg[key] = merged
+
+    return agg
+
+
+# ── File collection ──────────────────────────────────────────────────────────
+
+def collect_sources(target: Path) -> list[Path]:
+    if target.is_file():
+        return [target]
+    sources = sorted(
+        list(target.rglob("*.c")) + list(target.rglob("*.h"))
+    )
+    # Skip generated / build output files
+    skip_patterns = {"obj", "objfre", "objchk", "build", ".vs", "__pycache__"}
+    return [
+        p for p in sources
+        if not any(part.lower() in skip_patterns for part in p.parts)
+    ]
+
+
+# ── Reporting helper ─────────────────────────────────────────────────────────
+
+def _print_file_summary(payload: dict) -> None:
+    src = payload.get("source_file") or payload.get("source_dir", "?")
+    funcs_disp = len(payload.get("dispatch_level_code", "").split("\n\n")) if payload.get("dispatch_level_code") else 0
+    funcs_dpc  = len(payload.get("dpc_code", "").split("\n\n"))           if payload.get("dpc_code")  else 0
+    funcs_isr  = len(payload.get("isr_code", "").split("\n\n"))           if payload.get("isr_code")  else 0
+    handlers   = len(payload.get("dispatch_handlers", {}))
+    pageable   = len(payload.get("pageable_functions", []))
+    print(
+        f"  {Path(src).name:<40s} "
+        f"dispatch={funcs_disp} dpc={funcs_dpc} isr={funcs_isr} "
+        f"handlers={handlers} pageable={pageable}"
+    )
+
+
+# ── Entry point ──────────────────────────────────────────────────────────────
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Scan kernel-driver C sources and emit validator payloads"
+    )
+    parser.add_argument("target", help="Source file or directory to scan")
+    parser.add_argument(
+        "--output-dir", "-o",
+        default="scan_output",
+        help="Directory to write .checks.json files (default: scan_output/)",
+    )
+    parser.add_argument(
+        "--aggregate", "-a",
+        action="store_true",
+        help="Merge all files into one checks.json per directory",
+    )
+    parser.add_argument(
+        "--run", "-r",
+        action="store_true",
+        help="Run run_validators.py on the output immediately after scanning",
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+    )
+    args = parser.parse_args(argv)
+
+    target = Path(args.target)
+    if not target.exists():
+        print(f"ERROR: {target} does not exist", file=sys.stderr)
+        return 2
+
+    sources = collect_sources(target)
+    if not sources:
+        print(f"ERROR: no .c/.h files found under {target}", file=sys.stderr)
+        return 2
+
+    print(f"Scanning {len(sources)} source file(s) from {target}\n")
+
+    payloads: list[dict] = []
+    for src in sources:
+        try:
+            analysis = _analyse_file(src)
+            payload = build_payload(analysis)
+            payloads.append(payload)
+            if args.verbose:
+                _print_file_summary(payload)
+        except Exception as exc:
+            print(f"  [WARN] failed to parse {src}: {exc}", file=sys.stderr)
+
+    if not payloads:
+        print("ERROR: no payloads built", file=sys.stderr)
+        return 2
+
+    # Print summary table even without --verbose
+    if not args.verbose:
+        for p in payloads:
+            _print_file_summary(p)
+
+    # Write output
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    if args.aggregate:
+        agg = aggregate_payloads(payloads, target if target.is_dir() else target.parent)
+        out_path = out_dir / (target.stem + "_aggregate.checks.json")
+        out_path.write_text(json.dumps(agg, indent=2, ensure_ascii=False), encoding="utf-8")
+        written.append(out_path)
+        print(f"\nAggregate output → {out_path}")
+    else:
+        for payload in payloads:
+            stem = Path(payload["source_file"]).stem
+            out_path = out_dir / f"{stem}.checks.json"
+            # If multiple files share the same stem, disambiguate
+            counter = 1
+            while out_path in written:
+                out_path = out_dir / f"{stem}_{counter}.checks.json"
+                counter += 1
+            out_path.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+            written.append(out_path)
+        print(f"\n{len(written)} checks.json file(s) written to {out_dir}/")
+
+    # Optionally run validators
+    if args.run:
+        import subprocess
+        runner = Path(__file__).parent / "run_validators.py"
+        cmd = [sys.executable, str(runner), str(out_dir)]
+        print(f"\nRunning: {' '.join(cmd)}\n")
+        result = subprocess.run(cmd)
+        return result.returncode
+
+    print(f"\nNext step: python run_validators.py {out_dir}/")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

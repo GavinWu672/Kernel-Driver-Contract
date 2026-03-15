@@ -1,0 +1,40 @@
+{
+  "driver_code": "NTSTATUS DriverDispatch(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/driver_dispatch.c"
+  ],
+  "test_names": [
+    "driver_tests::test_sdv_rule_violation_detected"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: CancelSpinLock rule violation detected",
+    "Static Driver Verifier: IrqlKeDispatchLte rule failed",
+    "SAL analysis: C28167 - IRQL was changed in function and not restored"
+  ],
+  "static_analysis": {
+    "driver_verifier": {
+      "passed": false,
+      "defects": [
+        "CancelSpinLock: CancelIrql not restored before IoCompleteRequest"
+      ]
+    },
+    "sdv": {
+      "passed": false,
+      "rule_violations": [
+        "IrqlKeDispatchLte",
+        "CancelSpinLock"
+      ]
+    },
+    "sal": {
+      "passed": false,
+      "warnings": [
+        "C28167: The IRQL was changed in the function DriverDispatch and not restored"
+      ]
+    }
+  },
+  "summary": {
+    "failed": 3
+  },
+  "warnings": [],
+  "errors": []
+}

@@ -1,0 +1,32 @@
+{
+  "driver_code": "NTSTATUS DriverDispatch(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/driver_dispatch_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_sdv_clean_pass"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis: no IRQL or annotation warnings"
+  ],
+  "static_analysis": {
+    "driver_verifier": {
+      "passed": true,
+      "defects": []
+    },
+    "sdv": {
+      "passed": true,
+      "rule_violations": []
+    },
+    "sal": {
+      "passed": true,
+      "warnings": []
+    }
+  },
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

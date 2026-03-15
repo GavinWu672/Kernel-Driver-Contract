@@ -1,0 +1,18 @@
+{
+  "driver_code": "#pragma alloc_text(PAGE, DriverReadHandler)\nNTSTATUS DriverReadHandler(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp) {\n    PAGED_CODE();\n    UNREFERENCED_PARAMETER(DeviceObject);\n    Irp->IoStatus.Status = STATUS_SUCCESS;\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\nNTSTATUS DispatchHandler(_In_ PDEVICE_OBJECT DeviceObject, _In_ PIRP Irp) {\n    UNREFERENCED_PARAMETER(DeviceObject);\n    IoCompleteRequest(Irp, IO_NO_INCREMENT);\n    return STATUS_SUCCESS;\n}\n",
+  "changed_files": [
+    "fixtures/src/pageable_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_paged_code_annotation_correct"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms pageable section annotations are correct"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

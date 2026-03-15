@@ -1,0 +1,18 @@
+{
+  "dpc_code": "VOID SafeDpcRoutine(\n    _In_     PKDPC  Dpc,\n    _In_opt_ PVOID  DeferredContext,\n    _In_opt_ PVOID  SystemArgument1,\n    _In_opt_ PVOID  SystemArgument2\n) {\n    PDEVICE_OBJECT devObj = (PDEVICE_OBJECT)DeferredContext;\n    PDPC_WORK_ITEM ctx;\n    UNREFERENCED_PARAMETER(Dpc);\n    UNREFERENCED_PARAMETER(SystemArgument1);\n    UNREFERENCED_PARAMETER(SystemArgument2);\n    ctx = (PDPC_WORK_ITEM)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(DPC_WORK_ITEM), 'kwI ');\n    if (!ctx) return;\n    ctx->WorkItem = IoAllocateWorkItem(devObj);\n    if (!ctx->WorkItem) { ExFreePoolWithTag(ctx, 'kwI '); return; }\n    IoQueueWorkItem(ctx->WorkItem, SafeWorkItemCallback, DelayedWorkQueue, ctx);\n}\n",
+  "changed_files": [
+    "fixtures/src/dpc_safe.c"
+  ],
+  "test_names": [
+    "driver_tests::test_dpc_nonblocking_work_item_pattern"
+  ],
+  "diagnostics": [
+    "Static Driver Verifier: ruleset passed",
+    "SAL analysis confirms DPC routine is non-blocking"
+  ],
+  "summary": {
+    "failed": 0
+  },
+  "warnings": [],
+  "errors": []
+}

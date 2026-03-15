@@ -19,6 +19,15 @@ ai_behavior_override:
 validators:
   - validators/irql_safety_validator.py
   - validators/pool_type_validator.py
+  - validators/sync_primitive_validator.py
+  - validators/dpc_isr_validator.py
+  - validators/pageable_section_validator.py
+  - validators/dispatch_routine_validator.py
+  - validators/static_analysis_validator.py
 hard_stop_rules:
   - KD-002
   - KD-003
+  - KD-006
+  - KD-007
+  - KD-010
+ci_runner: run_validators.py
