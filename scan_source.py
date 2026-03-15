@@ -50,12 +50,15 @@ from typing import NamedTuple
 
 # ── Regex patterns ────────────────────────────────────────────────────────────
 
-# DPC / ISR function type annotations (in function signature or preceding line)
+# WDM DPC / ISR type annotations (in function signature or preceding line)
+# KMDF equivalents: EVT_WDF_INTERRUPT_DPC, EVT_WDF_TIMER_FUNC, EVT_WDF_DPC_FUNC
 _DPC_SIGNATURE = re.compile(
-    r"\b(KDEFERRED_ROUTINE|IO_DPC_ROUTINE|DPC_ROUTINE)\b"
+    r"\b(KDEFERRED_ROUTINE|IO_DPC_ROUTINE|DPC_ROUTINE"
+    r"|EVT_WDF_INTERRUPT_DPC|EVT_WDF_TIMER_FUNC|EVT_WDF_DPC_FUNC)\b"
 )
+# WDM ISR / KMDF ISR equivalents
 _ISR_SIGNATURE = re.compile(
-    r"\b(KSERVICE_ROUTINE|KMESSAGE_SERVICE_ROUTINE)\b"
+    r"\b(KSERVICE_ROUTINE|KMESSAGE_SERVICE_ROUTINE|EVT_WDF_INTERRUPT_ISR)\b"
 )
 
 # pageable section marker: #pragma alloc_text(PAGE, FuncName)
@@ -63,45 +66,129 @@ _ALLOC_TEXT_PAGE = re.compile(
     r"#\s*pragma\s+alloc_text\s*\(\s*PAGE\s*,\s*(\w+)\s*\)", re.IGNORECASE
 )
 
-# dispatch routine registration: DriverObject->MajorFunction[IRP_MJ_*] = Name;
+# WDM dispatch routine registration: DriverObject->MajorFunction[IRP_MJ_*] = Name;
 _MAJOR_FUNC_RE = re.compile(
     r"DriverObject\s*->\s*MajorFunction\s*\[\s*(IRP_MJ_\w+)\s*\]\s*=\s*(\w+)\s*;",
     re.MULTILINE,
 )
 
-# DPC registration: KeInitializeDpc(..., Routine, ...)
+# WDM DPC registration: KeInitializeDpc / IoInitializeDpcRequest
+# KMDF DPC registration:
+#   WDF_DPC_CONFIG_INIT(&cfg, DpcFunc)          — 2nd arg is callback
+#   WDF_TIMER_CONFIG_INIT(&cfg, TimerFunc)       — 2nd arg is callback
+#   WDF_INTERRUPT_CONFIG_INIT(&cfg, IsrFunc, DpcFunc) — 3rd arg is DPC callback
 _DPC_REGISTRATION = re.compile(
-    r"(?:KeInitializeDpc|IoInitializeDpcRequest|KeInsertQueueDpc)\s*\([^,)]*,\s*(\w+)",
+    r"(?:"
+    # WDM
+    r"(?:KeInitializeDpc|IoInitializeDpcRequest|KeInsertQueueDpc)\s*\([^,)]*,\s*(\w+)"
+    r"|"
+    # KMDF DPC / timer config init — function name is 2nd arg
+    r"(?:WDF_DPC_CONFIG_INIT|WDF_TIMER_CONFIG_INIT)\s*\([^,)]+,\s*(\w+)"
+    r"|"
+    # KMDF interrupt config init — DPC is 3rd arg
+    r"WDF_INTERRUPT_CONFIG_INIT\s*\([^,)]+,[^,)]+,\s*(\w+)"
+    r")",
     re.MULTILINE,
 )
 
-# ISR registration: IoConnectInterrupt(..., ServiceRoutine, ...)
-# ServiceRoutine is the 3rd argument
+# WDM ISR registration: IoConnectInterrupt — ServiceRoutine is 3rd arg
+# KMDF ISR registration: WDF_INTERRUPT_CONFIG_INIT(&cfg, IsrFunc, DpcFunc)
+#                         — ISR is 2nd arg
 _ISR_REGISTRATION = re.compile(
-    r"IoConnectInterrupt\s*\([^,)]+,[^,)]+,\s*(\w+)", re.MULTILINE
+    r"(?:"
+    # WDM
+    r"IoConnectInterrupt\s*\([^,)]+,[^,)]+,\s*(\w+)"
+    r"|"
+    # KMDF interrupt config init — ISR is 2nd arg
+    r"WDF_INTERRUPT_CONFIG_INIT\s*\([^,)]+,\s*(\w+)"
+    r")",
+    re.MULTILINE,
 )
 
 # Spinlock usage — heuristic for DISPATCH_LEVEL context inside a function
-_SPINLOCK_USE = re.compile(r"\bKeAcquireSpinLock\b|\bKeAcquireSpinLockAtDpcLevel\b")
+# Covers both WDM (KeAcquireSpinLock) and KMDF (WdfSpinLockAcquire, WdfInterruptAcquireLock)
+_SPINLOCK_USE = re.compile(
+    r"\bKeAcquireSpinLock\b"
+    r"|\bKeAcquireSpinLockAtDpcLevel\b"
+    r"|\bWdfSpinLockAcquire\b"
+    r"|\bWdfInterruptAcquireLock\b"
+)
 
-# Raise IRQL to DISPATCH
+# Raise IRQL to DISPATCH (WDM)
 _RAISE_IRQL = re.compile(r"\bKeRaiseIrql\s*\(\s*DISPATCH_LEVEL")
 
+# ── KMDF EVT_WDF forward-declaration registry ─────────────────────────────────
+# Pattern: EVT_WDF_<TYPE>  FuncName;
+# Captures (evt_type, func_name)
+_WDF_FORWARD_DECL = re.compile(
+    r"\bEVT_WDF_(\w+)\s+(\w+)\s*;", re.MULTILINE
+)
+
+# Maps EVT_WDF_<suffix> → IRQL context
+# DISPATCH_LEVEL callbacks
+_WDF_DPC_TYPES = {
+    "INTERRUPT_DPC",
+    "TIMER_FUNC",
+    "TIMER",          # older alias
+    "DPC_FUNC",
+    "PROGRAM_DMA",
+    "INTERRUPT_WORKITEM",   # also runs at PASSIVE but involves DPC handoff; treat as dpc
+}
+# DIRQL (above DISPATCH_LEVEL)
+_WDF_ISR_TYPES = {
+    "INTERRUPT_ISR",
+    "INTERRUPT_SYNCHRONIZE",
+}
+
+
+def _build_wdf_registry(sources: list[Path]) -> dict[str, str]:
+    """
+    Scan all source files for EVT_WDF_<TYPE> FuncName; forward declarations
+    and return a mapping {func_name: irql_context}.
+    irql_context is one of 'dpc', 'isr', 'dispatch', or 'driver'.
+    """
+    registry: dict[str, str] = {}
+    for path in sources:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for m in _WDF_FORWARD_DECL.finditer(text):
+            evt_type = m.group(1).upper()
+            func_name = m.group(2)
+            if evt_type in _WDF_ISR_TYPES:
+                registry[func_name] = "isr"
+            elif evt_type in _WDF_DPC_TYPES:
+                registry[func_name] = "dpc"
+            # other EVT_WDF_* (IO queue, PnP, power) → leave unregistered (driver)
+    return registry
+
 # Broad function definition pattern (C-style, not C++)
-# Matches:   ReturnType [__stdcall] FuncName(args...) [_SAL_] {
+# Matches:   ReturnType [__stdcall] FuncName(args...) [comment] {
+# Handles WDK pattern where /*++...--*/ comment sits between ')' and '{'.
 _FUNC_DEF_RE = re.compile(
     r"""
-    ^                           # start of line
-    (?:[\w\s\*]+?)              # return type (non-greedy)
-    \b(\w+)\s*                  # function name (captured)
-    \(                          # opening paren
-    [^)]*                       # params (no nested parens needed)
-    \)                          # closing paren
-    (?:\s*\w+)*\s*              # optional SAL / calling-convention suffixes
-    \{                          # opening brace — function body starts
+    ^                               # start of line
+    (?:[\w\s\*]+?)                  # return type (non-greedy, may span lines)
+    \b(\w+)\s*                      # function name (captured)
+    \(                              # opening paren
+    [^)]*                           # params (no nested parens needed)
+    \)                              # closing paren
+    \s*                             # optional whitespace / newlines
+    (?:/\*[\s\S]*?\*/\s*)*          # skip 0..n block comments (WDK /*++--*/ style)
+    (?://[^\n]*\n\s*)*              # skip 0..n line comments
+    \{                              # opening brace — function body starts
     """,
     re.VERBOSE | re.MULTILINE,
 )
+
+# C control-flow keywords and other non-function identifiers to exclude
+_C_KEYWORDS = frozenset({
+    "if", "else", "while", "for", "switch", "do", "return", "sizeof",
+    "typeof", "alignof", "case", "default", "break", "continue", "goto",
+    "typedef", "struct", "union", "enum", "extern", "static", "inline",
+    "__if_exists", "__if_not_exists", "__assume",
+})
 
 
 # ── Function extractor ───────────────────────────────────────────────────────
@@ -120,6 +207,9 @@ def extract_functions(code: str) -> list[FuncInfo]:
     functions: list[FuncInfo] = []
     for m in _FUNC_DEF_RE.finditer(code):
         name = m.group(1)
+        # Skip C control-flow keywords and other non-function identifiers
+        if name in _C_KEYWORDS:
+            continue
         brace_start = m.end() - 1  # position of '{'
         depth = 0
         end = brace_start
@@ -145,16 +235,30 @@ class FileAnalysis(NamedTuple):
     dispatch_handlers: dict[str, str]   # IRP_MJ_* → handler name
     dpc_registered: set[str]            # names registered as DPC callbacks
     isr_registered: set[str]            # names registered as ISR callbacks
+    wdf_registry: dict[str, str]        # EVT_WDF forward-decl map: name → context
     functions: list[FuncInfo]
 
 
-def _analyse_file(path: Path) -> FileAnalysis:
+def _extract_registered_names(pattern: re.Pattern, text: str) -> set[str]:
+    """
+    Extract function names from a registration pattern that may have multiple
+    capture groups (one per alternative branch).  Returns non-empty matches.
+    """
+    names: set[str] = set()
+    for m in pattern.finditer(text):
+        for g in m.groups():
+            if g:
+                names.add(g)
+    return names
+
+
+def _analyse_file(path: Path, wdf_registry: dict[str, str] | None = None) -> FileAnalysis:
     text = path.read_text(encoding="utf-8", errors="replace")
 
     pageable = set(_ALLOC_TEXT_PAGE.findall(text))
     handlers = {m.group(1): m.group(2) for m in _MAJOR_FUNC_RE.finditer(text)}
-    dpc_reg = set(_DPC_REGISTRATION.findall(text))
-    isr_reg = set(_ISR_REGISTRATION.findall(text))
+    dpc_reg = _extract_registered_names(_DPC_REGISTRATION, text)
+    isr_reg = _extract_registered_names(_ISR_REGISTRATION, text)
     funcs = extract_functions(text)
 
     return FileAnalysis(
@@ -164,6 +268,7 @@ def _analyse_file(path: Path) -> FileAnalysis:
         dispatch_handlers=handlers,
         dpc_registered=dpc_reg,
         isr_registered=isr_reg,
+        wdf_registry=wdf_registry or {},
         functions=funcs,
     )
 
@@ -186,6 +291,9 @@ def _classify_func(func: FuncInfo, analysis: FileAnalysis) -> str:
         return "dpc"
     if _ISR_SIGNATURE.search(pre) or name in analysis.isr_registered:
         return "isr"
+    # KMDF EVT_WDF forward-declaration lookup (cross-file registry)
+    if name in analysis.wdf_registry:
+        return analysis.wdf_registry[name]
     if _SPINLOCK_USE.search(body) or _RAISE_IRQL.search(body):
         return "dispatch"
     return "driver"
@@ -341,10 +449,16 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Scanning {len(sources)} source file(s) from {target}\n")
 
+    # Build WDF callback registry from all files before per-file analysis.
+    # This resolves cross-file EVT_WDF_* forward declarations (KMDF pattern).
+    wdf_registry = _build_wdf_registry(sources)
+    if wdf_registry:
+        print(f"WDF callback registry: {len(wdf_registry)} entries detected\n")
+
     payloads: list[dict] = []
     for src in sources:
         try:
-            analysis = _analyse_file(src)
+            analysis = _analyse_file(src, wdf_registry)
             payload = build_payload(analysis)
             payloads.append(payload)
             if args.verbose:
