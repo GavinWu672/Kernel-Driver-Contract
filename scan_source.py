@@ -150,8 +150,14 @@ _WDF_ISR_TYPES = {
 def _build_wdf_registry(sources: list[Path]) -> dict[str, str]:
     """
     Scan all source files for EVT_WDF_<TYPE> FuncName; forward declarations
-    and return a mapping {func_name: irql_context}.
-    irql_context is one of 'dpc', 'isr', 'dispatch', or 'driver'.
+    and return a mapping {func_name: label}.
+    label is one of 'dpc', 'isr', or 'other'.
+
+    Design principle: every EVT_WDF_* forward declaration is written into the
+    registry so that _classify_func can use framework registration as
+    authoritative truth and never fall through to the spinlock heuristic for
+    a known WDF callback.  Unknown/passive callback types (IO queue, PnP,
+    power, work items, etc.) receive label 'other'.
     """
     registry: dict[str, str] = {}
     for path in sources:
@@ -166,7 +172,13 @@ def _build_wdf_registry(sources: list[Path]) -> dict[str, str]:
                 registry[func_name] = "isr"
             elif evt_type in _WDF_DPC_TYPES:
                 registry[func_name] = "dpc"
-            # other EVT_WDF_* (IO queue, PnP, power) → leave unregistered (driver)
+            else:
+                # All other EVT_WDF_* types (IO queue, PnP, power, work items,
+                # completion routines, etc.) run at PASSIVE_LEVEL or at an
+                # IRQL determined by queue config — outside isr/dpc scope.
+                # Register as 'other' so the spinlock heuristic cannot
+                # override this known framework callback.
+                registry[func_name] = "other"
     return registry
 
 # Broad function definition pattern (C-style, not C++)

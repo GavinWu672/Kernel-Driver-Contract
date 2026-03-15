@@ -1,0 +1,99 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/nic_init.c",
+  "scope": "callback_role_classification",
+  "notes": "pcidrv KMDF adapter initialization. NICAllocRfdWorkItem is EVT_WDF_WORKITEM (PASSIVE_LEVEL), but scanner spinlock heuristic misfires and labels it 'dispatch'. NICFreeRfdWorkItem is also EVT_WDF_WORKITEM but has no spinlock in body — scanner correctly labels it 'other'. Reveals that the spinlock heuristic can override the correct WDF callback type when a workitem body happens to acquire a lock.",
+  "functions": {
+    "NICAllocRfdWorkItem": {
+      "label": "other",
+      "notes": "EVT_WDF_WORKITEM — declared in nic_def.h. Runs at PASSIVE_LEVEL. Scanner mislabels as 'dispatch' because body calls WdfSpinLockAcquire — spinlock heuristic false positive over a PASSIVE_LEVEL workitem."
+    },
+    "NICFreeRfdWorkItem": {
+      "label": "other",
+      "notes": "EVT_WDF_WORKITEM — declared in nic_def.h. Runs at PASSIVE_LEVEL. Scanner correctly labels 'other' (no spinlock in body)."
+    },
+    "LocalMmMapIoSpace": {
+      "label": "other",
+      "notes": "Internal wrapper for MmMapIoSpace. Not a registered callback."
+    },
+    "NICAllocateSoftwareResources": {
+      "label": "other",
+      "notes": "PASSIVE_LEVEL init helper. Not a registered callback."
+    },
+    "NICFreeSoftwareResources": {
+      "label": "other",
+      "notes": "PASSIVE_LEVEL cleanup helper. Not a registered callback."
+    },
+    "NICMapHWResources": {
+      "label": "other",
+      "notes": "Maps hardware resources during device add. PASSIVE_LEVEL. Not a registered callback."
+    },
+    "NICUnmapHWResources": {
+      "label": "other",
+      "notes": "Unmaps hardware resources. PASSIVE_LEVEL. Not a registered callback."
+    },
+    "NICGetDeviceInformation": {
+      "label": "other",
+      "notes": "Reads PCI device info. PASSIVE_LEVEL helper."
+    },
+    "NICReadAdapterInfo": {
+      "label": "other",
+      "notes": "Reads adapter EEPROM/registry info. PASSIVE_LEVEL helper."
+    },
+    "NICAllocAdapterMemory": {
+      "label": "other",
+      "notes": "Allocates DMA and descriptor memory. PASSIVE_LEVEL helper."
+    },
+    "NICFreeAdapterMemory": {
+      "label": "other",
+      "notes": "Frees adapter memory. PASSIVE_LEVEL helper."
+    },
+    "NICInitSendBuffers": {
+      "label": "other",
+      "notes": "Init helper for send buffer ring. PASSIVE_LEVEL."
+    },
+    "NICInitRecvBuffers": {
+      "label": "other",
+      "notes": "Init helper for receive buffer ring. PASSIVE_LEVEL."
+    },
+    "NICAllocRfd": {
+      "label": "other",
+      "notes": "Allocates a single RFD descriptor. Internal helper."
+    },
+    "NICFreeRfd": {
+      "label": "other",
+      "notes": "Frees a single RFD descriptor. Internal helper."
+    },
+    "NICSelfTest": {
+      "label": "other",
+      "notes": "Hardware self-test during init. PASSIVE_LEVEL."
+    },
+    "NICInitializeAdapter": {
+      "label": "other",
+      "notes": "Full adapter hardware initialization. PASSIVE_LEVEL."
+    },
+    "NICShutdown": {
+      "label": "other",
+      "notes": "Adapter shutdown sequence. Called from power-down path."
+    },
+    "HwSoftwareReset": {
+      "label": "other",
+      "notes": "Issues hardware software reset command. Internal helper."
+    },
+    "HwConfigure": {
+      "label": "other",
+      "notes": "Configures NIC hardware registers. Internal helper."
+    },
+    "HwSetupIAAddress": {
+      "label": "other",
+      "notes": "Sets up individual address filter. Internal helper."
+    },
+    "HwClearAllCounters": {
+      "label": "other",
+      "notes": "Clears hardware statistics counters. Internal helper."
+    },
+    "NICGetDeviceInfSettings": {
+      "label": "other",
+      "notes": "Reads INF settings from registry. PASSIVE_LEVEL."
+    }
+  }
+}

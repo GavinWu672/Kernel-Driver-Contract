@@ -1,0 +1,27 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/nic_recv.c",
+  "scope": "callback_role_classification",
+  "notes": "pcidrv KMDF receive path. NICHandleRecvInterrupt and NICServiceReadIrps are internal helpers called from NICEvtInterruptDpc — they run at DISPATCH_LEVEL but are NOT registered callbacks. Scanner spinlock heuristic misfires on them, producing dispatch false positives. This reveals a second scanner error class: spinlock heuristic over-fires on internal helpers.",
+  "functions": {
+    "NICHandleRecvInterrupt": {
+      "label": "other",
+      "notes": "Internal helper: 'called with the Rcv SPINLOCK held' (comment). Called from NICEvtInterruptDpc. Runs at DISPATCH_LEVEL but is NOT a registered callback. Scanner mislabels as 'dispatch' via spinlock heuristic — false positive."
+    },
+    "NICServiceReadIrps": {
+      "label": "other",
+      "notes": "Internal helper called from NICHandleRecvInterrupt. Serves pending read IRPs. Runs at DISPATCH_LEVEL (caller context) but not a registered callback. Scanner mislabels as 'dispatch' — false positive."
+    },
+    "NICReturnRFD": {
+      "label": "other",
+      "notes": "Internal helper: returns an RFD to the free list. Not a registered callback."
+    },
+    "NICStartRecv": {
+      "label": "other",
+      "notes": "Internal helper: starts receive processing. Not a registered callback."
+    },
+    "NICResetRecv": {
+      "label": "other",
+      "notes": "Internal helper: resets receive state. Not a registered callback."
+    }
+  }
+}

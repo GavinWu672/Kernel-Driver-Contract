@@ -1,0 +1,39 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/routines.c",
+  "scope": "callback_role_classification",
+  "notes": "pcidrv KMDF hardware utility routines. DumpStatsCounters acquires WdfSpinLock to safely read counters — spinlock heuristic misfires. All functions are internal helpers, not registered callbacks.",
+  "functions": {
+    "DumpStatsCounters": {
+      "label": "other",
+      "notes": "Reads hardware statistics counters under WdfSpinLockAcquire/Release. Internal helper called for diagnostics. Not a registered callback. Scanner mislabels as 'dispatch' via spinlock heuristic — false positive."
+    },
+    "WaitScb": {
+      "label": "other",
+      "notes": "Waits for SCB command register to be ready. Polling helper. Not a registered callback."
+    },
+    "MdiWrite": {
+      "label": "other",
+      "notes": "Writes to MDI (Management Data Interface) register. Hardware helper."
+    },
+    "MdiRead": {
+      "label": "other",
+      "notes": "Reads from MDI register. Hardware helper."
+    },
+    "NICIssueSelectiveReset": {
+      "label": "other",
+      "notes": "Issues a selective hardware reset. Internal helper."
+    },
+    "NICIssueFullReset": {
+      "label": "other",
+      "notes": "Issues a full hardware reset. Internal helper."
+    },
+    "D100SubmitCommandBlockAndWait": {
+      "label": "other",
+      "notes": "Submits a command block and waits for completion. Internal helper."
+    },
+    "GetMediaState": {
+      "label": "other",
+      "notes": "Queries current link/media state. Internal helper."
+    }
+  }
+}

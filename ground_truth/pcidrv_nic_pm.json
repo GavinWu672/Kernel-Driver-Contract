@@ -1,0 +1,79 @@
+{
+  "source": "external/wds2/general/pcidrv/kmdf/HW/nic_pm.c",
+  "scope": "callback_role_classification",
+  "notes": "pcidrv KMDF power management. MPSetPowerD0 and NICAddWakeUpPattern are internal helpers (not EVT_WDF_* registered callbacks). Scanner spinlock heuristic fires on both. NICConfigureForWakeUp appears twice in scanner output — likely a scanner extraction artifact from conditional compilation or macro; only listed once in GT.",
+  "functions": {
+    "MPSetPowerD0": {
+      "label": "other",
+      "notes": "Internal helper called from NICSetPower (power management path). Not a registered EVT_WDF callback. Scanner mislabels as 'dispatch' via spinlock heuristic — false positive."
+    },
+    "NICAddWakeUpPattern": {
+      "label": "other",
+      "notes": "Adds a WOL wake-up pattern. Has ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL) — can run at either level depending on caller. Not a registered WDF callback. Scanner mislabels as 'dispatch' — false positive."
+    },
+    "HwReadPowerPMDR": {
+      "label": "other",
+      "notes": "Reads Power Management Data Register. Internal hardware helper."
+    },
+    "MpClearPME_En": {
+      "label": "other",
+      "notes": "Clears PME enable bit in PCI config. Internal helper."
+    },
+    "MPSetPowerLowPrivate": {
+      "label": "other",
+      "notes": "Private low-power configuration helper. Not a registered callback."
+    },
+    "MPSetPowerD0Private": {
+      "label": "other",
+      "notes": "Private D0 power restore helper. Called from MPSetPowerD0."
+    },
+    "HwSetWakeUpConfigure": {
+      "label": "other",
+      "notes": "Configures hardware WOL registers. Internal helper."
+    },
+    "MPSetUpFilterCB": {
+      "label": "other",
+      "notes": "Sets up filter command block for WOL. Internal helper."
+    },
+    "MPIssueScbPoMgmtCommand": {
+      "label": "other",
+      "notes": "Issues SCB power management command. Internal helper."
+    },
+    "MPCalculateE100PatternForFilter": {
+      "label": "other",
+      "notes": "Calculates pattern bytes for WOL filter. Internal helper."
+    },
+    "MPCreateProgrammableFilter": {
+      "label": "other",
+      "notes": "Creates a programmable WOL filter entry. Internal helper."
+    },
+    "MPSetPowerLow": {
+      "label": "other",
+      "notes": "Transitions adapter to low-power state. Internal helper."
+    },
+    "MPAreTwoPatternsEqual": {
+      "label": "other",
+      "notes": "Compares two WOL patterns. Pure helper."
+    },
+    "NICExtractPMInfoFromPciSpace": {
+      "label": "other",
+      "notes": "Reads PM capability from PCI config space. PASSIVE_LEVEL init."
+    },
+    "NICSetPower": {
+      "label": "other",
+      "notes": "Top-level power state transition dispatcher. Not an EVT_WDF_DEVICE_SET_POWER — called internally from device power IRP handler."
+    },
+    "NICRemoveWakeUpPattern": {
+      "label": "other",
+      "notes": "Removes a single WOL pattern from the list. Internal helper."
+    },
+    "NICRemoveAllWakeUpPatterns": {
+      "label": "other",
+      "notes": "Removes all WOL patterns. Internal helper."
+    },
+    "NICConfigureForWakeUp": {
+      "label": "other",
+      "notes": "Configures NIC for WOL operation. Internal helper. Note: scanner may extract this function twice (conditional compilation artifact) — only one GT entry."
+    }
+  }
+}
