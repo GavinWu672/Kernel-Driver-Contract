@@ -1,92 +1,91 @@
 # Kernel Driver Contract
 
-This repository is a documentation-first and runtime-integrable governance baseline for Windows kernel-driver work.
+A policy-check prototype for Windows kernel driver code.
+Scans real `.c`/`.h` source files, runs rule validators, and enforces hard-stop violations in CI.
 
-It is intended to work as an external domain contract for `ai-governance-framework`, parallel to `USB-Hub-Firmware-Architecture-Contract`.
+**Scope (v1): KMDF-first.**
+The scanner reliably classifies KMDF `EVT_WDF_*` callbacks.
+WDM function-pointer cast registration is a known structural limitation — see [STATUS.md](STATUS.md).
 
-## Included
+---
 
-- `contract.yaml`
-- `AGENTS.md`
-- `KERNEL_DRIVER_CHECKLIST.md`
-- `KERNEL_DRIVER_ARCHITECTURE.md`
-- `WORKFLOW.md`
-- `VALIDATION_REQUIREMENTS.md`
-- `rules/kernel-driver/safety.md`
-- `validators/irql_safety_validator.py`
-- `validators/pool_type_validator.py`
-- `docs/architecture-review.md`
-- `PLAN.md`
-- `memory/`
+## What This Repo Does
 
-## Integration Goal
-
-This repository exists to validate that:
-
-- contract discovery works for a second domain
-- framework runtime hooks do not require domain-specific hardcoding
-- domain repos can evolve independently while sharing the same governance seam
-
-## Runtime Integration
-
-Typical framework-side verification commands:
-
-```powershell
-$env:AI_GOVERNANCE_PYTHON='C:\Users\daish\AppData\Local\Python\pythoncore-3.14-64\python.exe'
-
-& $env:AI_GOVERNANCE_PYTHON governance_tools\domain_contract_loader.py `
-  --contract ..\Kernel-Driver-Contract\contract.yaml `
-  --format human
-
-& $env:AI_GOVERNANCE_PYTHON runtime_hooks\core\post_task_check.py `
-  --file ..\Kernel-Driver-Contract\fixtures\post_task_response.txt `
-  --risk medium `
-  --oversight review-required `
-  --checks-file ..\Kernel-Driver-Contract\fixtures\irql_violation.checks.json `
-  --contract ..\Kernel-Driver-Contract\contract.yaml `
-  --format human
+```
+source file (.c/.h)
+    └─▶ scan_source.py        ← extract functions, classify IRQL context
+            └─▶ .checks.json  ← structured payload
+                    └─▶ run_validators.py   ← 7 validators, KD-001 to KD-010
+                                └─▶ pass / hard-stop violation
 ```
 
-The included IRQL post-task fixture intentionally triggers an IRQL violation through `KeWaitForSingleObject` in a dispatch-level code sample.
+| Component | File | Purpose |
+|-----------|------|---------|
+| Scanner | `scan_source.py` | Scan real driver source, emit `.checks.json` |
+| Runner | `run_validators.py` | Run all validators against payloads or fixtures |
+| Validators | `validators/` | KD-001–KD-010 (IRQL, pool, sync, DPC/ISR, pageable, dispatch, static analysis) |
+| Precision tool | `check_precision.py` | Measure extraction coverage + classification accuracy |
+| Ground truth | `ground_truth/` | Manually verified function labels (3 drivers, 42 functions) |
+| CI | `.gitlab-ci.yml` | Merge gate + full scan + precision regression |
+| Pre-commit | `scripts/pre-commit.hook` | Block commit on hard-stop violations |
 
-The contract now also marks:
+---
 
-- `KD-002`
-- `KD-003`
+## Quick Start
 
-as `hard_stop_rules`, so framework-side domain validator violations for those
-rule IDs now escalate into blocking `post_task_check` errors when enforcement routing is enabled.
+```bash
+# Scan a driver file
+python scan_source.py path/to/driver.c --output-dir out/
 
-The repository now includes two post-task baselines:
+# Run validators on the output
+python run_validators.py out/
 
-- `fixtures/irql_violation.checks.json`
-  - expected result: blocking `KD-IRQL-001` error via `KD-002` hard-stop enforcement
-- `fixtures/irql_compliant.checks.json`
-  - expected result: no domain-validator IRQL violation
-- `fixtures/pool_violation.checks.json`
-  - expected result: advisory `KD-POOL-001` warning
-- `fixtures/pool_compliant.checks.json`
-  - expected result: no pool-type domain warning
+# Run fixture self-tests
+python run_validators.py fixtures/
 
-## Operational Docs
+# Check classification precision against ground truth
+python check_precision.py --batch ground_truth/*.json \
+    --wdf-dirs path/to/driver/headers \
+    --min-coverage 1.0 --min-accuracy 0.85
 
-Use these documents as the primary operational layer for this repo:
+# Install pre-commit hook
+bash scripts/install-hooks.sh
+```
 
-- `WORKFLOW.md`
-  - describes the smallest end-to-end governance path
-- `VALIDATION_REQUIREMENTS.md`
-  - lists the validation layers and baseline expectations that should remain reproducible
-- `FACT_INTAKE.md`
-  - describes how to connect a real driver repository without inflating this repo's scope
+---
 
-## Next Step
+## Rules
 
-The next recommended step is to connect this contract repo to a real driver codebase using:
+| ID | Name | Enforcement |
+|----|------|-------------|
+| KD-001 | irql-aware-api | advisory |
+| KD-002 | irql-safe-api | **hard-stop** |
+| KD-003 | irql-pool-type | **hard-stop** |
+| KD-004–005 | (pool allocation) | advisory |
+| KD-006 | sync-primitive-irql | **hard-stop** |
+| KD-007 | dpc-isr-nonblocking | **hard-stop** |
+| KD-008 | paged-code-annotation | advisory |
+| KD-009 | dispatch-routine-registered | advisory |
+| KD-010 | static-analysis-clean | **hard-stop** |
 
-- `FACT_INTAKE.md`
-- `SOURCE_INVENTORY.md`
-- `FACT_INTAKE_WORKSHEET.md`
+---
 
-These files are intentionally minimal and exist only to support the first real driver-repo intake, not to create a large memory platform.
+## Precision Baseline
 
-The repository now also includes a minimal `memory/` layer so confirmed driver facts, decisions, and validation results have a stable place to persist once a real driver codebase is connected.
+See [STATUS.md](STATUS.md) for full details.
+
+| Family | Files | Extraction | Classification |
+|--------|-------|-----------|----------------|
+| KMDF (`EVT_WDF_*`) | 2 | 22/22 (100%) | 22/22 (100%) |
+| WDM (function-pointer cast) | 2 | 20/20 (100%) | 15/20 (75%) |
+| **Aggregate** | **4** | **42/42 (100%)** | **37/42 (88.1%)** |
+
+WDM misclassifications are a documented structural limitation (see STATUS.md § Known false negatives).
+
+---
+
+## Known Limitations (v1)
+
+- **WDM function-pointer cast registration** — `MajorFunction[]` assignment, `PI8042_KEYBOARD_ISR` cast, `PSERVICE_CALLBACK_ROUTINE`, etc. are not detectable by the current header-file registry approach. Requires registration-site tracking for v2.
+- **Single-file analysis** — validators operate on per-file payloads; cross-file correctness (e.g., full call-graph IRQL propagation) is out of scope.
+- **Real enterprise codebase** — not yet validated on production driver code.
