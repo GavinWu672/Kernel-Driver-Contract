@@ -40,9 +40,10 @@ jobs:
 
       - name: Run validators against all fixtures
         id: fixture_check
+        # Use || true so that violation fixtures detecting violations (exit 1)
+        # do not abort the step — the summarise step evaluates correctness.
         run: |
-          python run_validators.py fixtures/ --json > fixture_results.json
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          python run_validators.py fixtures/ --json > fixture_results.json || true
 
       - name: Upload fixture results
         uses: actions/upload-artifact@v4
@@ -55,19 +56,62 @@ jobs:
         if: always()
         run: |
           python - <<'EOF'
-          import json, sys
-          data = json.load(open("fixture_results.json"))
-          total  = len(data["fixtures"])
-          passed = sum(1 for f in data["fixtures"] if f.get("passed"))
-          print(f"### Fixture Self-Test: {passed}/{total} passed")
+          import json, sys, os
+
+          # Hard failure (blocks CI): compliant fixture reports violations (false positive).
+          # Warning only (non-blocking): violation fixture misses violations (false negative
+          #   indicates a validator gap, tracked separately from the CI gate).
+
+          path = "fixture_results.json"
+          if not os.path.exists(path) or os.path.getsize(path) == 0:
+              print("ERROR: fixture_results.json is missing or empty")
+              sys.exit(1)
+
+          data = json.load(open(path))
+          hard_failures = []
+          warnings = []
+
           for f in data["fixtures"]:
-              icon = "✅" if f.get("passed") else "❌"
-              print(f"{icon} `{f['fixture']}`")
+              name = os.path.basename(f["fixture"])
+              passed = f.get("passed", False)
+              is_violation = "_violation" in name
+
+              if not is_violation and not passed:
+                  hard_failures.append(f"FALSE POSITIVE: {name} is a compliant fixture but reported violations")
+              elif is_violation and passed:
+                  warnings.append(f"FALSE NEGATIVE: {name} should detect violations but passed clean (validator gap)")
+
+          compliant = [f for f in data["fixtures"] if "_compliant" in os.path.basename(f["fixture"])]
+          violation = [f for f in data["fixtures"] if "_violation" in os.path.basename(f["fixture"])]
+          print(f"### Fixture Self-Test: {len(compliant)} compliant, {len(violation)} violation fixtures")
+
+          for f in data["fixtures"]:
+              name = os.path.basename(f["fixture"])
+              is_violation = "_violation" in name
+              passed = f.get("passed", False)
+              if is_violation:
+                  icon = "✅" if not passed else "⚠️"
+                  label = "correctly detected violations" if not passed else "missed violations (gap)"
+              else:
+                  icon = "✅" if passed else "❌"
+                  label = "clean" if passed else "FALSE POSITIVE — should be clean"
+              print(f"{icon} `{name}` — {label}")
               for r in f.get("results", []):
                   for v in r.get("violations", []):
                       print(f"   - **{r['validator']}**: {v}")
-          if not data["overall_pass"]:
+
+          if warnings:
+              print("\n⚠️  Validator gaps (non-blocking):")
+              for w in warnings:
+                  print(f"  {w}")
+
+          if hard_failures:
+              print("\n❌ Hard failures (blocking):")
+              for msg in hard_failures:
+                  print(f"  {msg}")
               sys.exit(1)
+          else:
+              print(f"\n✅ No false positives. All compliant fixtures are clean.")
           EOF
 
   # ── Job 2: Scan changed .c/.h files in PR ────────────────────────────────

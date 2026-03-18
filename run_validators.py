@@ -189,34 +189,40 @@ def _collect_fixtures(target: Path) -> list[Path]:
     return sorted(Path(__file__).parent.glob("fixtures/**/*.checks.json"))
 
 
-def _print_report(fixture_result: dict[str, Any], verbose: bool) -> None:
+def _print_report(
+    fixture_result: dict[str, Any],
+    verbose: bool,
+    out: Any = None,
+) -> None:
+    if out is None:
+        out = sys.stdout
     fixture = fixture_result.get("fixture", "?")
     passed = fixture_result.get("passed", False)
     status = "PASS" if passed else "FAIL"
-    print(f"\n{'='*60}")
-    print(f"  {status}  {fixture}")
-    print(f"{'='*60}")
+    print(f"\n{'='*60}", file=out)
+    print(f"  {status}  {fixture}", file=out)
+    print(f"{'='*60}", file=out)
 
     if "error" in fixture_result:
-        print(f"  ERROR: {fixture_result['error']}")
+        print(f"  ERROR: {fixture_result['error']}", file=out)
         return
 
     for r in fixture_result.get("results", []):
         if r.get("error"):
-            print(f"  [{r['validator']}] ERROR: {r['error']}")
+            print(f"  [{r['validator']}] ERROR: {r['error']}", file=out)
             continue
 
         ok = r.get("ok", True)
         hs = r.get("hard_stop", False)
         tag = "HARD-STOP" if hs else ("WARN" if not ok else "ok")
         summary = r.get("evidence_summary", "")
-        print(f"  [{r['validator']:40s}] {tag:9s}  {summary}")
+        print(f"  [{r['validator']:40s}] {tag:9s}  {summary}", file=out)
 
         if verbose or not ok:
             for v in r.get("violations", []):
-                print(f"      VIOLATION: {v}")
+                print(f"      VIOLATION: {v}", file=out)
             for w in r.get("warnings", []):
-                print(f"      warning  : {w}")
+                print(f"      warning  : {w}", file=out)
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -274,23 +280,27 @@ def main(argv: list[str] | None = None) -> int:
     all_results: list[dict] = []
     overall_pass = True
 
+    # When --json is active, route human-readable text to stderr so that
+    # stdout contains only valid JSON (for redirect into fixture_results.json).
+    text_out = sys.stderr if args.json else sys.stdout
+
     for fixture_path in fixtures:
         fr = _run_fixture(fixture_path, validators)
         all_results.append(fr)
-        _print_report(fr, verbose=args.verbose)
+        _print_report(fr, verbose=args.verbose, out=text_out)
         if not fr.get("passed", False):
             overall_pass = False
 
-    # Summary line
+    # Summary line — always to text_out
     total = len(all_results)
     passed = sum(1 for r in all_results if r.get("passed"))
-    print(f"\n{'='*60}")
-    print(f"  SUMMARY: {passed}/{total} fixtures passed")
+    print(f"\n{'='*60}", file=text_out)
+    print(f"  SUMMARY: {passed}/{total} fixtures passed", file=text_out)
     if overall_pass:
-        print("  RESULT : ALL HARD-STOP CHECKS PASSED")
+        print("  RESULT : ALL HARD-STOP CHECKS PASSED", file=text_out)
     else:
-        print("  RESULT : HARD-STOP VIOLATIONS DETECTED — blocking merge")
-    print(f"{'='*60}\n")
+        print("  RESULT : HARD-STOP VIOLATIONS DETECTED — blocking merge", file=text_out)
+    print(f"{'='*60}\n", file=text_out)
 
     if args.json:
         print(json.dumps({"overall_pass": overall_pass, "fixtures": all_results}, indent=2))
