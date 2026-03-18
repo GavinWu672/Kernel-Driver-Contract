@@ -59,9 +59,32 @@ If any required fact is missing:
 - Passing all validators in this contract does not indicate DV-clean, SDV-clean, or WHQL-ready status.
 - When DV/SDV/HLK results are available, those take precedence over this tool's findings.
 
+## Unit Test Boundary Constraints
+
+- The agent must NOT attempt to stub `ntddk.h`, `wdf.h`, `wdm.h`, or any WDK-specific
+  header for user-mode compilation. These headers have unavoidable kernel-mode structural
+  dependencies that cannot be satisfied outside a WDK build environment.
+
+- User-mode unit tests must target function-level seams, not file-level compilation of
+  driver source files. Attempting to compile a full driver `.c` file in user mode by
+  providing synthetic WDK header stubs is a prohibited approach.
+
+- A valid seam is a function pointer or interface that can be substituted without
+  modifying driver source (e.g., `BUS_INTERFACE_STANDARD.GetBusData`).
+
+- If a natural seam does not exist at the target function, the agent must recommend
+  extracting pure business logic into a separate compilation unit, NOT creating synthetic
+  WDK header stubs.
+
+- A test build is valid only if it compiles without any WDK headers. If a WDK header is
+  required for compilation, the test boundary is drawn at the wrong level.
+
+- See `docs/unit-test-strategy.md` for the decision tree and canonical test structure.
+
 ## Related Documents
 
 - `KERNEL_DRIVER_CHECKLIST.md`
 - `KERNEL_DRIVER_ARCHITECTURE.md`
 - `STATUS.md`
 - `docs/microsoft-standards-mapping.md`
+- `docs/unit-test-strategy.md`

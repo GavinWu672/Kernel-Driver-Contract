@@ -89,3 +89,17 @@
   - static_analysis_output
 - Enforcement:
   - hard-stop
+
+## KD-011 - unit-test-boundary
+
+- User-mode unit tests must isolate the target function through an existing function-pointer
+  or struct-interface seam. Examples of valid seams: `BUS_INTERFACE_STANDARD.GetBusData`,
+  a driver-internal callback table, or a HAL abstraction pointer.
+- Test compilation must not require `ntddk.h`, `wdf.h`, `wdm.h`, or any header from the
+  WDK include path. Providing synthetic stubs for these headers is a prohibited approach.
+- If no natural seam exists, the correct response is to recommend extracting pure logic
+  into a separate compilation unit, not to stub WDK headers.
+- Evidence required:
+  - test_seam_review
+- Enforcement:
+  - hard-stop
