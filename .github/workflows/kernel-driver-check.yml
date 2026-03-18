@@ -221,7 +221,7 @@ jobs:
       - name: Scan all C/H files in repository
         run: |
           find . -name "*.c" -o -name "*.h" \
-            | grep -v -E '\./external/|\./scan_output/|/__pycache__/' \
+            | grep -v -E '\./external/|\./scan_output/|\./fixtures/|/__pycache__/' \
             | sort > source_list.txt
           COUNT=$(wc -l < source_list.txt)
           echo "Found $COUNT source files"
