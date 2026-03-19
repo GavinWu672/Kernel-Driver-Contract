@@ -111,6 +111,8 @@ The rule surface also includes `KD-011` for the user-mode unit-test seam policy,
 
 These cover IRQL safety, blocking behavior, synchronization, static-analysis expectations, plus the documented test-boundary policy.
 
+For review guidance on partially extracted helpers that only test a subset of a larger driver function, see docs/unit-test-strategy.md.
+
 ### KSTATE Rules
 
 `docs/microsoft-architecture-principles.md` adds architecture and lifecycle rules in this format:
