@@ -1,15 +1,46 @@
-# Kernel Driver Contract — Project Status
+# Kernel Driver Contract - Project Status
 
-> Last updated: 2026-03-15
-> Status: **controlled pilot candidate — KMDF-first v1**
+> Last updated: 2026-03-19
+> Status: **controlled pilot candidate - KMDF-first v1**
 
 ---
 
+## 1.0 Alpha Gate
+
+Current judgment:
+
+- not yet at `1.0 alpha`
+- currently best described as a `controlled pilot candidate` with strong sample-based evidence and much stronger contract governance than before
+
+### Must be true before calling this repo `1.0 alpha`
+
+- one real pure-KMDF driver repository is connected through the fact-intake flow
+- human-mandatory facts are confirmed for that pilot repo
+- at least one real Driver Verifier or SDV / WDK diagnostics artifact is ingested and recorded
+- one real task replay shows the model using fact ownership plus `KSTATE-*` / `KD-*` reasoning on actual code
+- release-facing scope is written clearly: `KMDF-first`, WDM out of scope for v1, accepted limitations explicitly listed
+
+### Accepted alpha limitations
+
+These do NOT block `1.0 alpha` if the above gate is satisfied:
+
+- WDM function-pointer cast blind spot remains v2 work
+- spinlock heuristic false positives remain documented for legacy NDIS-heritage KMDF patterns
+- deeper AST or dataflow analysis remains out of scope
+
+### Current blockers
+
+- no real driver project facts have been promoted from an adopter repo
+- no real Driver Verifier evidence has been recorded
+- no real SDV / WDK diagnostics have been recorded
+- no real adopter-task replay has been documented as evidence
+
+---
 ## What Has Been Proven
 
 ### Engineering closure
-- `scan_source.py` — scans real `.c`/`.h` kernel driver source files
-- `run_validators.py` — standalone CI/CD runner, no external framework needed
+- `scan_source.py` - scans real `.c`/`.h` kernel driver source files
+- `run_validators.py` - standalone CI/CD runner, no external framework needed
 - 7 validators covering KD-001 through KD-010 (IRQL, pool, sync, DPC/ISR, pageable section, dispatch routines, static analysis)
 - GitLab CI pipeline (merge gate + full-scan on push to main + precision regression gate)
 - GitHub Actions mirror
@@ -56,7 +87,7 @@ Aggregate per-label (10-file batch):
 
 ## Known Error Inventory
 
-### WDM cast FN (5) — structural, v2
+### WDM cast FN (5) - structural, v2
 
 All share root cause: scanner cannot resolve WDM function-pointer cast registration.
 
@@ -70,7 +101,7 @@ All share root cause: scanner cannot resolve WDM function-pointer cast registrat
 
 Fix requires registration-site tracking or AST analysis. Out of scope for v1.
 
-### Spinlock heuristic-only FP (5) — scoped v1 limitation
+### Spinlock heuristic-only FP (5) - scoped v1 limitation
 
 | Function | File | Expected | Got | Trigger |
 |----------|------|----------|-----|---------|
@@ -125,7 +156,7 @@ v1 capability tiers (evidence-based):
 **Decision: v1 scope = KMDF-first policy checker**
 
 - `MajorFunction[]` and other WDM cast patterns are marked as known structural limitations
-- WDM support requires registration-site tracking or AST analysis — out of scope for v1
+- WDM support requires registration-site tracking or AST analysis - out of scope for v1
 - Spinlock heuristic is retained as-is; adjustments deferred until counterexample evidence justifies the risk of introducing new FN
 
 ---
@@ -174,6 +205,6 @@ The 85% floor reflects the known WDM structural gap and pcidrv spinlock FP. The 
 
 ## Next Steps (prioritized)
 
-1. **Real driver repo pilot** — controlled scan of one internal pure-KMDF driver; measure FP rate and RD feedback. Prerequisite: KMDF target to stay within proven v1 scope.
-2. **Pre-commit hook polish** — packaging and adoption guidance
-3. **WDM registration-site tracking (v2)** — requires AST or dataflow analysis; out of scope for v1
+1. **Real driver repo pilot** - controlled scan of one internal pure-KMDF driver; measure FP rate and RD feedback. Prerequisite: KMDF target to stay within proven v1 scope.
+2. **Pre-commit hook polish** - packaging and adoption guidance
+3. **WDM registration-site tracking (v2)** - requires AST or dataflow analysis; out of scope for v1
