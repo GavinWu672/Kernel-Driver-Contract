@@ -2,6 +2,7 @@
 
 > Purpose: reviewer-citable constraint payload derived from Microsoft's kernel-mode driver architecture guidance.
 > Scope: architecture and lifecycle constraints for contract-guided reasoning.
+> Reference basis: `Kernel-Mode Driver Architecture Design Guide (Microsoft).pdf` plus existing WDK-oriented contract constraints in this repo. This document is a reviewer-oriented, contract-friendly distillation rather than an official Microsoft normative specification.
 > Not a replacement for WDK, SDV, Driver Verifier, or HLK evidence.
 
 ## Rule Format

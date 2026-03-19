@@ -10,6 +10,8 @@ This repo is no longer only a scanner demo. It now defines:
 - validator-backed safety rules
 - intake and workflow guidance for connecting a real driver repo
 
+
+The current lifecycle-oriented architecture guidance and `KSTATE-*` rule surface were refined with reference to `Kernel-Mode Driver Architecture Design Guide (Microsoft).pdf`. They should be read as a contract-friendly distillation of that guidance, not as an official Microsoft certification or standards substitute.
 It remains a governance and validation layer, not a replacement for WDK, SDV, Driver Verifier, or HLK.
 
 ## Current Shape
