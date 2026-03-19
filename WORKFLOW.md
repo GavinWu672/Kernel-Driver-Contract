@@ -46,7 +46,7 @@ Use this stage before starting a real driver-oriented AI coding session.
 Expected outcome:
 
 - kernel-driver domain context is injected
-- `AGENTS.md`, checklist, and architecture guidance appear in the session summary
+- `AGENTS.md`, checklist, architecture guidance, and Microsoft-derived state rules appear in the session summary
 - validator preflight succeeds
 
 ## Stage 3: Pre-Task Governance Check
@@ -110,10 +110,17 @@ Use this stage only after a real driver repository is available.
 Work in this order:
 
 1. record discovered source locations in `SOURCE_INVENTORY.md`
-2. fill the first confirmed facts in `FACT_INTAKE_WORKSHEET.md`
-3. promote confirmed values into `memory/02_project_facts.md`
-4. record decisions in `memory/03_decisions.md`
-5. record real validation evidence in `memory/04_validation_log.md`
+2. resolve human-mandatory facts first in `FACT_INTAKE_WORKSHEET.md`
+3. produce an AI-verifiable fact summary with source locations in `FACT_INTAKE_WORKSHEET.md`
+4. promote confirmed values into `KERNEL_DRIVER_CHECKLIST.md`
+5. promote stable confirmed facts into `memory/02_project_facts.md`
+6. record lifecycle or architecture decisions in `memory/03_decisions.md`
+7. record real validation evidence in `memory/04_validation_log.md`
+
+Session bootstrap rule:
+
+- if a human-mandatory fact required by the task is unresolved, the correct response is a blocking query
+- if an AI-verifiable fact is unresolved, the agent may perform a bounded code scan and surface the finding for confirmation
 
 ## Scope Boundary
 

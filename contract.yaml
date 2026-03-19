@@ -9,6 +9,8 @@ documents:
   - KERNEL_DRIVER_ARCHITECTURE.md
   - STATUS.md
   - docs/microsoft-standards-mapping.md
+  - docs/microsoft-architecture-principles.md
+  - FACT_INTAKE.md
 
 ai_behavior_override:
   - AGENTS.md

@@ -1,145 +1,182 @@
 # Kernel Driver Contract
 
-A policy-check prototype for Windows kernel driver code.
-Scans real `.c`/`.h` source files, runs rule validators, and enforces hard-stop violations in CI.
+A reusable domain contract for Windows kernel-driver work inside `ai-governance-framework`.
 
-**Scope (v1): KMDF-first.**
-The scanner reliably classifies KMDF `EVT_WDF_*` callbacks.
-WDM function-pointer cast registration is a known structural limitation — see [STATUS.md](STATUS.md).
+This repo is no longer only a scanner demo. It now defines:
 
----
+- kernel-driver AI behavior constraints
+- state-machine-oriented architecture invariants
+- human-mandatory versus AI-verifiable driver facts
+- validator-backed safety rules
+- intake and workflow guidance for connecting a real driver repo
 
-## What This Repo Does
+It remains a governance and validation layer, not a replacement for WDK, SDV, Driver Verifier, or HLK.
 
-```
-source file (.c/.h)
-    └─▶ scan_source.py        ← extract functions, classify IRQL context
-            └─▶ .checks.json  ← structured payload
-                    └─▶ run_validators.py   ← 7 validators, KD-001 to KD-010
-                                └─▶ pass / hard-stop violation
-```
+## Current Shape
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| Scanner | `scan_source.py` | Scan real driver source, emit `.checks.json` |
-| Runner | `run_validators.py` | Run all validators against payloads or fixtures |
-| Validators | `validators/` | KD-001–KD-010 (IRQL, pool, sync, DPC/ISR, pageable, dispatch, static analysis) |
-| Precision tool | `check_precision.py` | Measure extraction coverage + classification accuracy |
-| Ground truth | `ground_truth/` | Manually verified function labels (10 files, 111 functions, 4 driver families) |
-| CI | `.gitlab-ci.yml` | Merge gate + full scan + precision regression |
-| Pre-commit | `scripts/pre-commit.hook` | Block commit on hard-stop violations |
-| Standards mapping | `docs/microsoft-standards-mapping.md` | Traceability against Driver Verifier / SDV rule intents |
+The contract is built from six document surfaces plus validator-backed rules:
 
----
+- `KERNEL_DRIVER_CHECKLIST.md`
+  - fact model split into `Human-Mandatory Facts` and `AI-Verifiable Facts`
+- `KERNEL_DRIVER_ARCHITECTURE.md`
+  - state invariants for PnP, power, interrupt, DMA, namespace, and teardown boundaries
+- `docs/microsoft-architecture-principles.md`
+  - Microsoft-derived constraint payload with review-citable rule IDs such as `KSTATE-003`
+- `docs/microsoft-standards-mapping.md`
+  - traceability map against Driver Verifier, SDV, SAL, and HLK intent
+- `FACT_INTAKE.md`
+  - intake policy for resolving hardware and lifecycle facts without guessing
+
+The runtime contract entrypoint is `contract.yaml`.
+
+## Why This Exists
+
+The main AI failure mode in kernel work is not only bad syntax. It is incorrect lifecycle reasoning.
+
+Typical failures include:
+
+- touching hardware before start completion
+- assuming interrupts or DMA remain valid during stop or surprise removal
+- inventing DMA, interrupt, or config-space facts that were never confirmed
+- treating power transitions as ordinary request-handling paths
+- describing cleanup only on the success path
+
+This contract pushes the model toward explicit lifecycle and ownership reasoning instead of prompt-level guesswork.
+
+## State Invariant Model
+
+`KERNEL_DRIVER_ARCHITECTURE.md` treats architecture as state invariants, not only abstract boundaries.
+
+Core invariants include:
+
+- PnP state controls hardware visibility
+- low-power states limit legal work
+- interrupt and DPC paths are valid only within active resource lifetime
+- DMA ownership is tied to a specific started-device lifetime
+- namespace and security surfaces are external contract surfaces
+- teardown requirements apply to normal, failed-start, stop, surprise-remove, remove, cancel, and power-down paths
+
+If the current lifecycle state is unknown, the correct response is to stop and request the missing fact.
+
+## Fact Model
+
+`KERNEL_DRIVER_CHECKLIST.md` separates facts into two classes.
+
+### Human-Mandatory Facts
+
+These must come from project files, hardware contracts, design notes, or reviewer-confirmed sources.
+
+Examples:
+
+- `DRIVER_TYPE`
+- `PNP_MODEL`
+- `POWER_MANAGED`
+- `IRQL_MAX`
+- `INTERRUPT_MODEL`
+- `DMA_MODEL`
+- `CONFIG_SPACE_ACCESS_LEVEL`
+- `POOL_TYPE`
+
+Missing human-mandatory facts should block implementation guidance.
+
+### AI-Verifiable Facts
+
+These may be derived from code, but must still be surfaced with source locations for human confirmation.
+
+Examples:
+
+- `IOCTL_SURFACE_PRESENT`
+- `DEVICE_NAMING_MODEL`
+- `SECURITY_DESCRIPTOR_MODEL`
+- `REMOVE_LOCK_USED`
+- `LOCKING_PRIMITIVES`
+- `IRP_COMPLETION_MODEL`
+- `CLEANUP_PATTERN`
+
+## Rule Surfaces
+
+### KD Rules
+
+The validator-backed safety rules live in `rules/kernel-driver/safety.md` and are enforced by the validators under `validators/`.
+
+Current hard-stop set in `contract.yaml`:
+
+- `KD-002`
+- `KD-003`
+- `KD-006`
+- `KD-007`
+- `KD-010`
+
+The rule surface also includes `KD-011` for the user-mode unit-test seam policy, but it is not currently listed in the contract hard-stop set.
+
+These cover IRQL safety, blocking behavior, synchronization, static-analysis expectations, plus the documented test-boundary policy.
+
+### KSTATE Rules
+
+`docs/microsoft-architecture-principles.md` adds architecture and lifecycle rules in this format:
+
+`[Rule ID] constraint -> violation consequence`
+
+Examples:
+
+- `KSTATE-001` start gates hardware visibility
+- `KSTATE-003` surprise remove kills hardware access
+- `KSTATE-101` low-power state blocks normal I/O assumptions
+- `KSTATE-301` DMA ownership is state-bound
+- `KSTATE-501` every stateful acquisition needs stateful teardown
+
+These are designed to be cited directly in session bootstrap, pre-task reasoning, post-task review, and reviewer handoff notes.
 
 ## Quick Start
 
-```bash
-# Scan a driver file
-python scan_source.py path/to/driver.c --output-dir out/
+Validate that the contract loads:
 
-# Run validators on the output
-python run_validators.py out/
-
-# Run fixture self-tests
-python run_validators.py fixtures/
-
-# Check classification precision against ground truth
-python check_precision.py --batch ground_truth/*.json \
-    --wdf-dirs path/to/driver/headers \
-    --min-coverage 1.0 --min-accuracy 0.85
-
-# Install pre-commit hook
-bash scripts/install-hooks.sh
+```powershell
+python governance_tools/domain_contract_loader.py --contract E:\BackUp\Git_EE\Kernel-Driver-Contract\contract.yaml --format human
 ```
 
----
+Run a runtime bootstrap against the contract:
 
-## Rules
-
-| ID | Name | Enforcement |
-|----|------|-------------|
-| KD-001 | irql-aware-api | advisory |
-| KD-002 | irql-safe-api | **hard-stop** |
-| KD-003 | irql-pool-type | **hard-stop** |
-| KD-004–005 | (pool allocation) | advisory |
-| KD-006 | sync-primitive-irql | **hard-stop** |
-| KD-007 | dpc-isr-nonblocking | **hard-stop** |
-| KD-008 | paged-code-annotation | advisory |
-| KD-009 | dispatch-routine-registered | advisory |
-| KD-010 | static-analysis-clean | **hard-stop** |
-
----
-
-## Precision Baseline
-
-See [STATUS.md](STATUS.md) for full details.
-
-| Tier | Representative files | Extraction | Classification |
-|------|---------------------|-----------|----------------|
-| Pure KMDF (`EVT_WDF_*`) | kmdf_fx2 (2 files) | 15/15 (100%) | 15/15 (100%) |
-| KMDF + NDIS heritage (explicit spinlocks) | pcidrv (6 files) | 76/76 (100%) | 71/76 (93.4%) |
-| WDM function-pointer cast | kbfiltr, cancel (2 files) | 20/20 (100%) | 15/20 (75%) |
-| **Aggregate** | **10 files, 4 families** | **111/111 (100%)** | **101/111 (91.0%)** |
-
-WDM misclassifications are a documented structural limitation. In tested samples, spinlock heuristic FP appeared only in the KMDF+NDIS-heritage family. See [STATUS.md](STATUS.md) for the full error inventory.
-
----
-
-## Pilot Quick Start
-
-For running the first scan on a real driver directory and interpreting results.
-
-**Step 1 — Scan source files**
-
-```bash
-python scan_source.py path/to/driver/ --output-dir out/
+```powershell
+python runtime_hooks/core/session_start.py `
+  --project-root E:\BackUp\Git_EE\Kernel-Driver-Contract `
+  --plan E:\BackUp\Git_EE\Kernel-Driver-Contract\PLAN.md `
+  --rules common,kernel-driver `
+  --risk medium `
+  --oversight review-required `
+  --contract E:\BackUp\Git_EE\Kernel-Driver-Contract\contract.yaml `
+  --format human
 ```
 
-This produces one `.checks.json` per `.c` file. Each file contains extracted functions with their classified roles (`isr`, `dpc`, `dispatch`, `other`) and any detected violation patterns.
+Run a post-task fixture baseline:
 
-**Step 2 — Run validators**
-
-```bash
-python run_validators.py out/
+```powershell
+python runtime_hooks/core/post_task_check.py `
+  --file E:\BackUp\Git_EE\Kernel-Driver-Contract\fixtures\post_task_response.txt `
+  --risk medium `
+  --oversight review-required `
+  --checks-file E:\BackUp\Git_EE\Kernel-Driver-Contract\fixtures\irql_violation.checks.json `
+  --contract E:\BackUp\Git_EE\Kernel-Driver-Contract\contract.yaml `
+  --format human
 ```
 
-Output format per file:
+## Real Driver Intake
 
-```
-[PASS]      out/foo.checks.json
-[HARD-STOP] out/bar.checks.json  KD-002: KeWaitForSingleObject called in ISR context
-```
+When connecting a real driver repo, work in this order:
 
-- `PASS` — no violations detected
-- `ADVISORY` — flagged, informational only, does not block
-- `HARD-STOP` — would block a merge gate; treat as a real issue to investigate
+1. record source artifacts in `SOURCE_INVENTORY.md`
+2. resolve human-mandatory facts in `FACT_INTAKE_WORKSHEET.md`
+3. produce AI-verifiable fact summaries with source locations
+4. promote confirmed values into `KERNEL_DRIVER_CHECKLIST.md`
+5. record stable facts and decisions under `memory/`
 
-**Step 3 — Interpret results**
+Do not mark the contract as grounded in a real driver repo until hardware and lifecycle facts are actually sourced.
 
-| What you see | What it means |
-|--------------|---------------|
-| False positive on a helper function | Check if the function is called from a spinlock-held context. If it is a pure helper with no locking semantics, add it to the `other` bucket by confirming it has no `EVT_WDF_*` declaration. |
-| ISR classification on a non-ISR callback | Likely a WDM function-pointer cast registration. This is a known v1 structural limitation — see STATUS.md § WDM cast FN. |
-| No functions extracted | Confirm the file has standard C function definitions; heavily macro-wrapped functions may not be extracted. |
-| High false positive rate on `dispatch` label | If the driver uses legacy explicit spinlock patterns (NDIS-heritage), the spinlock heuristic may fire on helper functions. Document and count before deciding to filter. |
+## Scope Boundary
 
-**Step 4 — Measure classification quality (optional)**
+This repository is intentionally narrow.
 
-If you have time to build a ground truth sample (20–30 functions, manually verified):
-
-```bash
-python check_precision.py --batch your_gt.json \
-    --wdf-dirs path/to/driver/headers \
-    --min-coverage 1.0 --min-accuracy 0.85
-```
-
-Expected baseline for a pure KMDF driver: extraction 100%, classification ~100%. Anything below 90% warrants investigation before relying on the validator results.
-
----
-
-## Known Limitations (v1)
-
-- **WDM function-pointer cast registration** — `MajorFunction[]` assignment, `PI8042_KEYBOARD_ISR` cast, `PSERVICE_CALLBACK_ROUTINE`, etc. are not detectable by the current header-file registry approach. Requires registration-site tracking for v2.
-- **Single-file analysis** — validators operate on per-file payloads; cross-file correctness (e.g., full call-graph IRQL propagation) is out of scope.
-- **Real enterprise codebase** — not yet validated on production driver code.
+- It is a domain contract, not the production driver codebase.
+- It improves pre-task and post-task governance, not token-level interception.
+- It complements WDK, SDV, Driver Verifier, and HLK instead of replacing them.
+- It should grow only when real driver evidence forces a concrete new requirement.
